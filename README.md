@@ -1,7 +1,4 @@
-# mp-eventwatcher
- MAD Plugin: Automatically put Events that boost spawns in your DB
-
-# Usage:
+## Usage:
 - cd to MAD/plugins/
 - `git clone https://github.com/ccev/mp-eventwatcher.git`
 - `cp plugin.ini.example plugin.ini`
