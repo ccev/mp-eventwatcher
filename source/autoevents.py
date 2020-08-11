@@ -5,12 +5,9 @@ import time
 
 from threading import Thread
 from flask import render_template, Blueprint, jsonify
-from typing import Optional, List
 from datetime import datetime, timedelta
 
-from mapadroid.utils.questGen import generate_quest
-from mapadroid.utils.s2Helper import S2Helper
-from mapadroid.utils.gamemechanicutil import calculate_mon_level
+from mapadroid.madmin.functions import auth_required
 import mapadroid.utils.pluginBase
 
 class EventWatcher(mapadroid.utils.pluginBase.Plugin):
@@ -29,8 +26,26 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self.version = self._versionconfig.get("plugin", "version", fallback="1.0")
         self.pluginname = self._versionconfig.get("plugin", "pluginname", fallback="EventWatcher")
 
+        self.templatepath = self._rootdir + "/template/"
+        self.staticpath = self._rootdir + "/static/"
+
+        self._routes = [
+            ("/eventwatcher", self.ewreadme_route),
+        ]
+        self._hotlink = [
+            ("Plugin Page", "/eventwatcher", ""),
+        ]
+
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
-            self._plugin = Blueprint(str(self.pluginname), __name__)
+            self._plugin = Blueprint(str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
+
+            for route, view_func in self._routes:
+                self._plugin.add_url_rule(route, route.replace("/", ""), view_func=view_func)
+
+            for name, link, description in self._hotlink:
+                self._mad['madmin'].add_plugin_hotlink(name, self._plugin.name+"."+link.replace("/", ""),
+                                                       self.pluginname, self.description, self.author, self.url,
+                                                       description, self.version)
 
     def perform_operation(self):
         """The actual implementation of the identity plugin is to just return the
@@ -110,3 +125,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         ae_worker = Thread(name="EventWatcher", target=self.EventWatcher)
         ae_worker.daemon = True
         ae_worker.start()
+
+    @auth_required
+    def ewreadme_route(self):
+        return render_template("eventwatcher.html", header="Event Watcher", title="Event Watcher")
