@@ -1,6 +1,6 @@
 ## Usage:
 - cd to MAD/plugins/
-- `git clone https://github.com/ccev/mp-eventwatcher.git`
+- `git clone https://github.com/ccev/mp-eventwatcher.git && cd mp-eventwatcher`
 - `cp plugin.ini.example plugin.ini`
 - Restart MAD
 - The only config option is the sleep time in-between runs. by default, it's 1 hour.
