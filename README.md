@@ -12,6 +12,6 @@ There's one config option: `sleep` to define the time to wait in-between checkin
 please also join [this discord](https://discord.gg/cMZs5tk)
 
 ## How does it work?
-To not put unnecessary load on cool community-made websites, the Plugin pulls data from [this file](https://raw.githubusercontent.com/ccev/pogoinfo/info/events/mad.json). A JSON file I automatically update and commit to github.
+To not put unnecessary load on cool community-made websites, the Plugin pulls data from [this file](https://raw.githubusercontent.com/ccev/pogoinfo/info/events/mad.json). A list I automatically update and commit to github.
 
 The Plugin then grabs that file and checks if an event is missing for you or changed information and then updates your database accordingly.
