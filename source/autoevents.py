@@ -21,7 +21,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._pluginconfig.read(self._rootdir + "/plugin.ini")
         self._versionconfig.read(self._rootdir + "/version.mpl")
         self.author = self._versionconfig.get("plugin", "author", fallback="ccev")
-        self.url = self._versionconfig.get("plugin", "url", fallback="https://github.com/ccev/eventwatcher")
+        self.url = self._versionconfig.get("plugin", "url", fallback="https://github.com/ccev/mp-eventwatcher")
         self.description = self._versionconfig.get("plugin", "description", fallback="Automatically put Events that boost Spawns in your database")
         self.version = self._versionconfig.get("plugin", "version", fallback="1.0")
         self.pluginname = self._versionconfig.get("plugin", "pluginname", fallback="EventWatcher")
