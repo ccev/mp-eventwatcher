@@ -3,7 +3,7 @@ You can import this like any other MAD Plugin.
 
 If this is the first time you're setting up a MAD Plugin:
 - Download the ShinyWatcher.mp file ([can be found here](https://raw.githubusercontent.com/ccev/mp-eventwatcher/master/EventWatcher.mp) - if the site shows text, you can create an empty EventWatcher.mp file and paste that text into it)
-- Open madmin.cop/plugins, click "Choose file" and choose the EventWatcher.mp file you just downloaded. Or drag&drop it there.
+- Open {madmin.com}/plugins, click "Choose file" and choose the EventWatcher.mp file you just downloaded. Or drag&drop it there.
 - go to MAD/plugins/EventWatcher/ and `cp plugin.ini plugin.ini.example`
 - Restart MAD
 
