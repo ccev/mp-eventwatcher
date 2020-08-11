@@ -1,4 +1,5 @@
 ## Usage:
+please don't use this rn
 - cd to MAD/plugins/
 - `git clone https://github.com/ccev/mp-eventwatcher.git && cd mp-eventwatcher`
 - `cp plugin.ini.example plugin.ini`
