@@ -70,6 +70,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         return True
     
     def _convert_time(self, time_string, local):
+        if time_string is None:
+            return datetime(2020, 1, 1, 0, 0, 0)
         time = datetime.strptime(time_string, "%Y-%m-%d %H:%M")
         if not local:
             time = time + timedelta(hours=self.tz_offset)
@@ -77,19 +79,19 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     
     def _update_event(self, event):
         vals = {
-            "event_name": event.get("name", "unknown name"),
             "event_start": event["start"].strftime('%Y-%m-%d %H:%M:%S'),
             "event_end": event["end"].strftime('%Y-%m-%d %H:%M:%S'),
             "event_lure_duration": event.get("lure_duratiion", 30)
         }
-        self._mad['db_wrapper'].autoexec_insert("trs_event", vals)
-        self._mad['logger'].success(f"Auto Events: Put {vals['event_name']} in your DB")
+        where = {
+            "event_name": event["type_name"]
+        }
+        self._mad['db_wrapper'].autoexec_update("trs_event", vals, where_keyvals=where)
+        self._mad['logger'].success(f"Auto Events: Put {event['name']} in your DB")
 
     def EventWatcher(self):
         while True:
             query = "select event_name, event_start, event_end from trs_event;"
-
-            mad_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/mad.json").json()
             db_events = self._mad['db_wrapper'].autofetch_all(query)
             events_in_db = {}
             for db_event in db_events:
@@ -98,25 +100,54 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     "event_end": db_event["event_end"]
                 }
             
-            for mad_event in mad_events:
+            gh_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/mad.json").json()
+            mad_events_old = gh_events["events"]
+            self.event_types = gh_events["types"]
+
+            for event_type_name in self.event_types.values():
+                if event_type_name not in events_in_db.keys():
+                    vals = {
+                        "event_name": event_type_name,
+                        "event_start": datetime(2020, 1, 1, 0, 0, 0),
+                        "event_end": datetime(2020, 1, 1, 0, 0, 0),
+                        "event_lure_duration": 30
+                    }
+                    self._mad['db_wrapper'].autoexec_insert("trs_event", vals)
+                    self._mad['logger'].success(f"Auto Events: Created event type {event_type_name}")
+
+                    events_in_db[event_type_name] = {
+                        "event_start": None,
+                        "event_end": None
+                    }
+
+            mad_events = []
+            for mad_event in mad_events_old:
                 start = self._convert_time(mad_event["start"], mad_event["local_times"])
                 end = self._convert_time(mad_event["end"], mad_event["local_times"])
-                mad_event["start"] = start
-                mad_event["end"] = end
 
-                if end < datetime.now():
-                    continue
+                if end > datetime.now():
+                    mad_events.append({
+                        "name": mad_event["name"],
+                        "type": mad_event["type"],
+                        "lure_duration": mad_event["lure_duration"],
+                        "start": start,
+                        "end": end
+                    })
+            
+            def sortkey(s):
+                return s["start"]
+            
+            mad_events.sort(key=sortkey)
+            finished_events = []
 
-                if mad_event["name"] not in events_in_db.keys():
-                    self._update_event(mad_event)
-                    continue
+            for mad_event in mad_events:
+                if mad_event["type"] not in finished_events:
+                    mad_event["type_name"] = self.event_types.get(mad_event["type"])
 
-                existing_event = events_in_db.get(mad_event["name"], {})
+                    if events_in_db[mad_event["type_name"]]["event_start"] != mad_event["start"] or events_in_db[mad_event["type_name"]]["event_end"] != mad_event["end"]:
+                        self._update_event(mad_event)
+                    finished_events.append(mad_event["type"])
 
-                if start != existing_event.get("event_start", start) or end != existing_event.get("event_end", end):
-                    self._mad['db_wrapper'].autoexec_delete("trs_event", {"event_name": mad_event["name"]})
-                    self._update_event(mad_event)
-                    continue
             time.sleep(self.__sleep)
 
     def autoeventThread(self):
