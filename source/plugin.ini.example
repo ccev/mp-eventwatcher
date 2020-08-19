@@ -1,3 +1,4 @@
 [plugin]
 active = true
+delete_events = false
 sleep = 3600

@@ -64,6 +64,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         self.tz_offset = datetime.now().hour - datetime.utcnow().hour
         self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
+        self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
 
         self.autoeventThread()
 
@@ -116,8 +117,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     self._mad['logger'].success(f"Auto Events: Created event type {event_type_name}")
 
                     events_in_db[event_type_name] = {
-                        "event_start": None,
-                        "event_end": None
+                        "event_start": datetime(2020, 1, 1, 0, 0, 0),
+                        "event_end": datetime(2020, 1, 1, 0, 0, 0)
                     }
 
             mad_events = []
@@ -129,6 +130,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     mad_events.append({
                         "name": mad_event["name"],
                         "type": mad_event["type"],
+                        "type_name": self.event_types.get(mad_event["type"]),
                         "lure_duration": mad_event["lure_duration"],
                         "start": start,
                         "end": end
@@ -142,11 +144,18 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
             for mad_event in mad_events:
                 if mad_event["type"] not in finished_events:
-                    mad_event["type_name"] = self.event_types.get(mad_event["type"])
-
                     if events_in_db[mad_event["type_name"]]["event_start"] != mad_event["start"] or events_in_db[mad_event["type_name"]]["event_end"] != mad_event["end"]:
                         self._update_event(mad_event)
                     finished_events.append(mad_event["type"])
+            
+            if self.__delete_events:
+                for event_name in events_in_db.keys():
+                    if not event_name in self.event_types.values():
+                        vals = {
+                            "event_name": event_name
+                        }
+                        self._mad['db_wrapper'].autoexec_delete("trs_event", vals)
+                        self._mad['logger'].success(f"Auto Events: Deleted event {event_name}")
 
             time.sleep(self.__sleep)
 
