@@ -7,7 +7,9 @@ If this is the first time you're setting up a MAD Plugin:
 - go to MAD/plugins/EventWatcher/ and `cp plugin.ini plugin.ini.example`
 - Restart MAD
 
-There's one config option: `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
+There's two config options:
+- `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
+- `delete_events` if you want Event Watcher to delete non-needed events (including basically all you've created yourself) - by default it's set to False.
 
 please also join [this discord](https://discord.gg/cMZs5tk)
 
