@@ -4,10 +4,12 @@ You can import this like any other MAD Plugin.
 If this is the first time you're setting up a MAD Plugin:
 - Download the EventWatcher.mp file ([can be found here](https://raw.githubusercontent.com/ccev/mp-eventwatcher/master/EventWatcher.mp) - if the site shows text, you can create an empty EventWatcher.mp file and paste that text into it)
 - Open {madmin.com}/plugins, click "Choose file" and choose the EventWatcher.mp file you just downloaded. Or drag&drop it there.
-- go to MAD/plugins/EventWatcher/ and `cp plugin.ini plugin.ini.example`
+- go to MAD/plugins/EventWatcher/ and `cp plugin.ini.example plugin.ini`
 - Restart MAD
 
-There's one config option: `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
+There's two config options:
+- `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
+- `delete_events` if you want Event Watcher to delete non-needed events (including basically all you've created yourself) - by default it's set to False.
 
 please also join [this discord](https://discord.gg/cMZs5tk)
 
