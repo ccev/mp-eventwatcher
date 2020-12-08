@@ -66,11 +66,26 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
         self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
 
+        self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
+        self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
+        self.__quests_min_length = self._pluginconfig.getint("Quest Resets", "min_event_length")
+        self.__quests_confidence = self._pluginconfig.getint("Quest Resets", "min_confidence")
+
+        max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
+        self.__quests_max_hour = int(max_time[0])
+        self.__quests_max_minute = int(max_time[1])
+
+        try:
+            with open(self._rootdir + "/walker_settings.json", "r", encoding="utf8") as f:
+                self.__quests_walkers = json.load(f)
+        except FileNotFoundError:
+            self.__quests_walkers = []
+
         self.autoeventThread()
 
         return True
     
-    def _convert_time(self, time_string, local):
+    def _convert_time(self, time_string, local=True):
         if time_string is None:
             return datetime(2020, 1, 1, 0, 0, 0)
         time = datetime.strptime(time_string, "%Y-%m-%d %H:%M")
@@ -90,8 +105,64 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._mad['db_wrapper'].autoexec_update("trs_event", vals, where_keyvals=where)
         self._mad['logger'].success(f"Auto Events: Put {event['name']} in your DB")
 
+    def _check_quest_resets(self):
+        def time_limit(time):
+            return time.hour > self.__quests_max_hour and time.minute > self.__quests_max_minute
+        def to_timestring(time):
+            return time.strftime("%H:%M")
+        all_quest_resets = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/quest_resets.json").json()
+        smallest_time = datetime(2100, 1, 1, 0, 0, 0)
+        final_time = None
+
+        now = datetime.now()
+        for event in all_quest_resets:
+            if event["confidence"] < self.__quests_confidence:
+                continue
+            if event["length"] < self.__quests_min_length:
+                continue
+
+            time = self._convert_time(event["time"])
+            if time < now:
+                continue
+            if time_limit(time):
+                continue
+
+            if time < smallest_time:
+                smallest_time = time
+
+        if smallest_time.year == 2100:
+            final_time = self.__quests_default_time
+        else:
+            if (smallest_time.date() == datetime.today().date()) or (smallest_time.date() == (datetime.today() + timedelta(days=1)).date()):
+                final_time = to_timestring(smallest_time)
+            else:
+                final_time = self.__quests_default_time
+
+        if final_time is None:
+            return
+
+        for walkerarea, timestring in self.__quests_walkers.items():
+            """vals = {
+                "algo_value": timestring.replace("?", final_time)
+            }
+            where = {
+                "walkerarea_id": walkerarea
+            }
+
+            self._mad['db_wrapper'].autoexec_update("settings_walkerarea", vals, where_keyvals=where)"""
+
+
+            elem = self._mad['data_manager'].get_resource('walkerarea', walkerarea)
+            elem['walkervalue'] = timestring.replace("?", final_time)
+            elem.save()
+            self._mad['logger'].success(f"Auto Events: Updated Quest areas to {final_time}")
+
+
     def EventWatcher(self):
         while True:
+            if self.__quests_enable:
+                self._check_quest_resets()
+
             query = "select event_name, event_start, event_end from trs_event;"
             db_events = self._mad['db_wrapper'].autofetch_all(query)
             events_in_db = {}
