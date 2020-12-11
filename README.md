@@ -26,7 +26,6 @@ Event Watcher can automatically adjust Quest scan times based on on-going events
 enable: Whether or not to enable this
 default_time: The time you want Quest scans to start on normal days
 max_time: Ignore reset times that are bigger than this
-min_event_length: The minimum length an event must have to re-scan events (max = 24, cdays = 6) 
 min_confidence: (10 = cdays, 9 = events with special quests)
 ```
 
@@ -38,7 +37,7 @@ min_confidence: (10 = cdays, 9 = events with special quests)
 ```
 get your walkerarea id by opening MADmin, then go to Settings > Walkers > The walker you want > edit the area the time must be edited for. The URL will now look something like this: `https://madmin.com/settings/walker/areaeditor?id=10&walkerarea=101`. In this case, the 101 is what you want.
 
-The `?` will be replaced with the correct quest reset time. Depending on your walker setup, the format of the value will lokk different. I have a mon area on `period` and the value `00:00-02:00`, then the quest area following it. In this case, my json would look like this:
+The `?` will be replaced with the correct quest reset time. Depending on your walker setup, the format of the value will look different. I have a mon area on `period` and the value `00:00-03:00`, then the quest area following it. In this case, my json would look like this:
 
 ```json
 {
