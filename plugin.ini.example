@@ -8,5 +8,4 @@ delete_events = false
 enable = true
 default_time = 02:00
 max_time = 12:00
-min_event_length = 24
 min_confidence = 9

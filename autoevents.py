@@ -68,7 +68,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
         self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
-        self.__quests_min_length = self._pluginconfig.getint("Quest Resets", "min_event_length")
         self.__quests_confidence = self._pluginconfig.getint("Quest Resets", "min_confidence")
 
         max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
@@ -106,11 +105,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._mad['logger'].success(f"Auto Events: Put {event['name']} in your DB")
 
     def _check_quest_resets(self):
-        def time_limit(time):
-            return time.hour > self.__quests_max_hour and time.minute > self.__quests_max_minute
         def to_timestring(time):
             return time.strftime("%H:%M")
         all_quest_resets = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/quest_resets.json").json()
+        self._mad['logger'].success(all_quest_resets)
         smallest_time = datetime(2100, 1, 1, 0, 0, 0)
         final_time = None
 
@@ -118,13 +116,11 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         for event in all_quest_resets:
             if event["confidence"] < self.__quests_confidence:
                 continue
-            if event["length"] < self.__quests_min_length:
-                continue
 
             time = self._convert_time(event["time"])
             if time < now:
                 continue
-            if time_limit(time):
+            if time.hour > self.__quests_max_hour and time.minute >= self.__quests_max_minute:
                 continue
 
             if time < smallest_time:
@@ -133,7 +129,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if (smallest_time.date() == datetime.today().date()) or (smallest_time.date() == (datetime.today() + timedelta(days=1)).date()):
+            if smallest_time.date() == (datetime.today() + timedelta(days=1)).date():
                 final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
