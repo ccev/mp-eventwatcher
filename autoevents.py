@@ -62,25 +62,33 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if self._mad['args'].config_mode == True:
             return False
 
-        self.tz_offset = datetime.now().hour - datetime.utcnow().hour
-        self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
-        self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
-
-        self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
-        self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
-        self.__quests_confidence = self._pluginconfig.getint("Quest Resets", "min_confidence")
-
-        max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
-        self.__quests_max_hour = int(max_time[0])
-        self.__quests_max_minute = int(max_time[1])
-
         try:
-            with open(self._rootdir + "/walker_settings.json", "r", encoding="utf8") as f:
-                self.__quests_walkers = json.load(f)
-        except FileNotFoundError:
-            self.__quests_walkers = []
+            self.tz_offset = datetime.now().hour - datetime.utcnow().hour
+            self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
+            self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
 
-        self.autoeventThread()
+            if "Quest Resets" in self._pluginconfig.sections():
+                self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
+                self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
+                self.__quests_confidence = self._pluginconfig.getint("Quest Resets", "min_confidence")
+
+                max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
+                self.__quests_max_hour = int(max_time[0])
+                self.__quests_max_minute = int(max_time[1])
+            else:
+                self.__quests_enable = False
+
+            try:
+                with open(self._rootdir + "/walker_settings.json", "r", encoding="utf8") as f:
+                    self.__quests_walkers = json.load(f)
+            except FileNotFoundError:
+                self.__quests_walkers = []
+
+            self.autoeventThread()
+
+        except Exception as e:
+            self._mad['logger'].error("Exception initializing EventWatcher: {}", e)
+            return False
 
         return True
     
