@@ -75,6 +75,21 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
                 self.__quests_max_hour = int(max_time[0])
                 self.__quests_max_minute = int(max_time[1])
+
+                reset_for = self._pluginconfig.get("Quest Resets", "reset_for", fallback="event")
+                self.__quests_reset_types = {}
+                for etype in reset_for:
+                    etype = etype.strip()
+                    if ":" in etype:
+                        split = etype.split(":")
+                        etype = split[0]
+                        if "start" in split[1]:
+                            times = ["start"]
+                        elif "end" in split[1]:
+                            times = ["end"]
+                    else:
+                        times = ["start", "end"]
+                    self.__quests_reset_types[etype] = times
             else:
                 self.__quests_enable = False
 
@@ -122,6 +137,9 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         now = datetime.now()
         for event in all_quest_resets:
+            etype = event["type"]
+            if not etype[1] in self.__quests_reset_types.get(etype[0], []):
+                continue
             if event["confidence"] < self.__quests_confidence:
                 continue
 
@@ -137,7 +155,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if smallest_time.date() == (datetime.today() + timedelta(days=1)).date():
+            if smallest_time.date() == (datetime.today() + timedelta(days=1)).date() or smallest_time.date() == datetime.today().date():
                 final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
