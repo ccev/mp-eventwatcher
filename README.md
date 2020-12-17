@@ -26,6 +26,10 @@ Event Watcher can automatically adjust Quest scan times based on on-going events
 enable: Whether or not to enable this
 default_time: The time you want Quest scans to start on normal days
 max_time: Ignore reset times that are bigger than this
+reset_for: Define event types and if you want quests to reset for their start, end or both.
+  - event,cday - if you want to rescan quests for every start and end of an event and cday
+  - event:start - only rescan quests for event starts (my personal recommendation)
+  - cday,event:end - Rescan quests for cday starts and ends, but only for event ends
 min_confidence: (10 = cdays, 9 = events with special quests)
 ```
 
