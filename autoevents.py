@@ -78,7 +78,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
                 reset_for = self._pluginconfig.get("Quest Resets", "reset_for", fallback="event")
                 self.__quests_reset_types = {}
-                for etype in reset_for:
+                for etype in reset_for.split(","):
                     etype = etype.strip()
                     if ":" in etype:
                         split = etype.split(":")
@@ -131,7 +131,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         def to_timestring(time):
             return time.strftime("%H:%M")
         all_quest_resets = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/quest_resets.json").json()
-        self._mad['logger'].success(all_quest_resets)
         smallest_time = datetime(2100, 1, 1, 0, 0, 0)
         final_time = None
 
