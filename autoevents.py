@@ -36,6 +36,15 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             ("Plugin Page", "/eventwatcher", ""),
         ]
 
+        self.type_to_name = {
+            "community-day": "Community Days",
+            "spotlight-hour": "Spotlight Hours",
+            "event": "Regular Events",
+            "default": "DEFAULT",
+            "?": "Others"
+        }
+        self.default_time = datetime(2020, 1, 1, 0, 0, 0)
+
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
             self._plugin = Blueprint(str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
 
@@ -78,7 +87,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
                 reset_for = self._pluginconfig.get("Quest Resets", "reset_for", fallback="event")
                 self.__quests_reset_types = {}
-                for etype in reset_for.split(","):
+                for etype in reset_for.split(" "):
                     etype = etype.strip()
                     if ":" in etype:
                         split = etype.split(":")
@@ -109,37 +118,22 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     
     def _convert_time(self, time_string, local=True):
         if time_string is None:
-            return datetime(2020, 1, 1, 0, 0, 0)
+            return self.default_time
         time = datetime.strptime(time_string, "%Y-%m-%d %H:%M")
         if not local:
             time = time + timedelta(hours=self.tz_offset)
         return time
-    
-    def _update_event(self, event):
-        vals = {
-            "event_start": event["start"].strftime('%Y-%m-%d %H:%M:%S'),
-            "event_end": event["end"].strftime('%Y-%m-%d %H:%M:%S'),
-            "event_lure_duration": event.get("lure_duratiion", 30)
-        }
-        where = {
-            "event_name": event["type_name"]
-        }
-        self._mad['db_wrapper'].autoexec_update("trs_event", vals, where_keyvals=where)
-        self._mad['logger'].success(f"Auto Events: Put {event['name']} in your DB")
 
     def _check_quest_resets(self):
         def to_timestring(time):
             return time.strftime("%H:%M")
-        all_quest_resets = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/quest_resets.json").json()
         smallest_time = datetime(2100, 1, 1, 0, 0, 0)
         final_time = None
 
         now = datetime.now()
-        for event in all_quest_resets:
-            etype = event["type"]
-            if not etype[1] in self.__quests_reset_types.get(etype[0], []):
-                continue
-            if event["confidence"] < self.__quests_confidence:
+        for event in self._quest_events:
+            timetype = event["time_type"]
+            if not timetype in self.__quests_reset_types.get(event["type"], []):
                 continue
 
             time = self._convert_time(event["time"])
@@ -161,93 +155,123 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         if final_time is None:
             return
-
+        
+        found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
-            """vals = {
-                "algo_value": timestring.replace("?", final_time)
-            }
-            where = {
-                "walkerarea_id": walkerarea
-            }
-
-            self._mad['db_wrapper'].autoexec_update("settings_walkerarea", vals, where_keyvals=where)"""
-
-
             elem = self._mad['data_manager'].get_resource('walkerarea', walkerarea)
-            elem['walkervalue'] = timestring.replace("?", final_time)
-            elem.save()
-            self._mad['logger'].success(f"Auto Events: Updated Quest areas to {final_time}")
 
+            current_time = elem["walkervalue"].replace(timestring.replace("?", ""), "")
+            if current_time != final_time:
+                elem['walkervalue'] = timestring.replace("?", final_time)
+                elem.save()
+                self._mad['logger'].success(f"Event Watcher: Updated Quest areas to {final_time}")
+                found_any = True
+        
+        if found_any:
+            self._mad["mapping_manager"].update()
+            self._mad["logger"].success("Even Watcher: Applied Settings")
+
+    def _check_spawn_events(self):
+        # get existing events from the db and bring them in a format that's easier to work with
+        query = "select event_name, event_start, event_end from trs_event;"
+        db_events = self._mad['db_wrapper'].autofetch_all(query)
+        events_in_db = {}
+        for db_event in db_events:
+            events_in_db[db_event["event_name"]] = {
+                "event_start": db_event["event_start"],
+                "event_end": db_event["event_end"]
+            }
+
+        # check if there are missing event entries in the db and if so, create them
+        for event_type_name in self.type_to_name.values():
+            if event_type_name not in events_in_db.keys():
+                vals = {
+                    "event_name": event_type_name,
+                    "event_start": self.default_time,
+                    "event_end": self.default_time,
+                    "event_lure_duration": 30
+                }
+                self._mad['db_wrapper'].autoexec_insert("trs_event", vals)
+                self._mad['logger'].success(f"Event Watcher: Created event type {event_type_name}")
+
+                events_in_db[event_type_name] = {
+                    "event_start": self.default_time,
+                    "event_end": self.default_time
+                }
+        
+        # go through all events that boost spawns, check if their times differ from the event in the db
+        # and if so, update the db accordingly
+        finished_events = []
+        for event_dict in self._spawn_events:
+            if event_dict["type"] not in finished_events:
+                db_entry = events_in_db[event_dict["type_name"]]
+                if db_entry["event_start"] != event_dict["start"] or db_entry["event_end"] != event_dict["end"]:
+                    vals = {
+                        "event_start": event_dict["start"].strftime('%Y-%m-%d %H:%M:%S'),
+                        "event_end": event_dict["end"].strftime('%Y-%m-%d %H:%M:%S'),
+                        "event_lure_duration": event_dict.get("lure_duratiion", 30)
+                    }
+                    where = {
+                        "event_name": self.type_to_name.get(event_dict["type"], "Others")
+                    }
+                    self._mad['db_wrapper'].autoexec_update("trs_event", vals, where_keyvals=where)
+                    self._mad['logger'].success(f"Event Watcher: Updated {event_dict['type']}")
+
+                finished_events.append(event_dict["type"])
+        
+        # just deletes all events that aren't part of Event Watcher
+        if self.__delete_events:
+            for event_name in events_in_db:
+                if not event_name in self.type_to_name.values():
+                    vals = {
+                        "event_name": event_name
+                    }
+                    self._mad['db_wrapper'].autoexec_delete("trs_event", vals)
+                    self._mad['logger'].success(f"Event Watcher: Deleted event {event_name}")
+
+    def _get_events(self):
+        # get the event list from github
+        raw_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/v2/active/events.json").json()
+        self._spawn_events = []
+        self._quest_events = []
+
+        # sort out events that have ended, bring them into a format that's easier to work with
+        # and put them into seperate lists depending if they boost spawns or reset quests
+        # then sort those after their start time
+        for raw_event in raw_events:
+            start = self._convert_time(raw_event["start"])
+            end = self._convert_time(raw_event["end"])
+            if end < datetime.now():
+                continue
+            event_dict = {
+                "start": start,
+                "end": end,
+                "type": raw_event["type"]
+            }
+            
+            if raw_event["has_spawnpoints"]:
+                self._spawn_events.append(event_dict)
+            if raw_event["has_quests"]:
+                for key in ["start", "end"]:
+                    event_dict["time"] = event_dict[key]
+                    event_dict["time_type"] = key
+                    self._quest_events.append(event_dict)
+        
+        self._quest_events = sorted(self._quest_events, key=lambda e: e["start"])
+        self._spawn_events = sorted(self._spawn_events, key=lambda e: e["time"])
 
     def EventWatcher(self):
+        # the main loop of the plugin just calling the important functions
         while True:
-            if self.__quests_enable:
+            self._get_events()
+
+            if self.__quests_enable and len(self._quest_events) > 0:
+                self._mad['logger'].info("Event Watcher: Check Quest Resets")
                 self._check_quest_resets()
 
-            query = "select event_name, event_start, event_end from trs_event;"
-            db_events = self._mad['db_wrapper'].autofetch_all(query)
-            events_in_db = {}
-            for db_event in db_events:
-                events_in_db[db_event["event_name"]] = {
-                    "event_start": db_event["event_start"],
-                    "event_end": db_event["event_end"]
-                }
-            
-            gh_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/info/events/mad.json").json()
-            mad_events_old = gh_events["events"]
-            self.event_types = gh_events["types"]
-
-            for event_type_name in self.event_types.values():
-                if event_type_name not in events_in_db.keys():
-                    vals = {
-                        "event_name": event_type_name,
-                        "event_start": datetime(2020, 1, 1, 0, 0, 0),
-                        "event_end": datetime(2020, 1, 1, 0, 0, 0),
-                        "event_lure_duration": 30
-                    }
-                    self._mad['db_wrapper'].autoexec_insert("trs_event", vals)
-                    self._mad['logger'].success(f"Auto Events: Created event type {event_type_name}")
-
-                    events_in_db[event_type_name] = {
-                        "event_start": datetime(2020, 1, 1, 0, 0, 0),
-                        "event_end": datetime(2020, 1, 1, 0, 0, 0)
-                    }
-
-            mad_events = []
-            for mad_event in mad_events_old:
-                start = self._convert_time(mad_event["start"], mad_event["local_times"])
-                end = self._convert_time(mad_event["end"], mad_event["local_times"])
-
-                if end > datetime.now():
-                    mad_events.append({
-                        "name": mad_event["name"],
-                        "type": mad_event["type"],
-                        "type_name": self.event_types.get(mad_event["type"]),
-                        "lure_duration": mad_event["lure_duration"],
-                        "start": start,
-                        "end": end
-                    })
-            
-            def sortkey(s):
-                return s["start"]
-            
-            mad_events.sort(key=sortkey)
-            finished_events = []
-
-            for mad_event in mad_events:
-                if mad_event["type"] not in finished_events:
-                    if events_in_db[mad_event["type_name"]]["event_start"] != mad_event["start"] or events_in_db[mad_event["type_name"]]["event_end"] != mad_event["end"]:
-                        self._update_event(mad_event)
-                    finished_events.append(mad_event["type"])
-            
-            if self.__delete_events:
-                for event_name in events_in_db.keys():
-                    if not event_name in self.event_types.values():
-                        vals = {
-                            "event_name": event_name
-                        }
-                        self._mad['db_wrapper'].autoexec_delete("trs_event", vals)
-                        self._mad['logger'].success(f"Auto Events: Deleted event {event_name}")
+            if len(self._spawn_events) > 0:
+                self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
+                self._check_spwn_events()
 
             time.sleep(self.__sleep)
 
