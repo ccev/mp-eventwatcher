@@ -103,7 +103,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
             try:
                 with open(self._rootdir + "/walker_settings.txt", "r", encoding="utf8") as f:
-                    quests_walkers = f.read
+                    quests_walkers = f.read()
                 self.__quests_walkers = {}
                 for line in quests_walkers.strip("\n").split("\n"):
                     splits = line.split(" ")
@@ -139,7 +139,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             if not timetype in self.__quests_reset_types.get(event["type"], []):
                 continue
 
-            time = self._convert_time(event["time"])
+            time = event["time"]
             if time < now:
                 continue
             if time.hour > self.__quests_max_hour and time.minute >= self.__quests_max_minute:
@@ -207,7 +207,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         finished_events = []
         for event_dict in self._spawn_events:
             if event_dict["type"] not in finished_events:
-                db_entry = events_in_db[event_dict["type_name"]]
+                type_name = self.type_to_name.get(event_dict["type"], "Others")
+                db_entry = events_in_db[type_name]
                 if db_entry["event_start"] != event_dict["start"] or db_entry["event_end"] != event_dict["end"]:
                     vals = {
                         "event_start": event_dict["start"].strftime('%Y-%m-%d %H:%M:%S'),
@@ -260,8 +261,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     event_dict["time_type"] = key
                     self._quest_events.append(event_dict)
         
-        self._quest_events = sorted(self._quest_events, key=lambda e: e["start"])
-        self._spawn_events = sorted(self._spawn_events, key=lambda e: e["time"])
+        self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
+        self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
 
     def EventWatcher(self):
         # the main loop of the plugin just calling the important functions
@@ -274,7 +275,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
             if len(self._spawn_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
-                self._check_spwn_events()
+                self._check_spawn_events()
 
             time.sleep(self.__sleep)
 
