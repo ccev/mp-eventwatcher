@@ -95,6 +95,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                             times = ["start"]
                         elif "end" in split[1]:
                             times = ["end"]
+                        else:
+                            times = ["start", "end"]
                     else:
                         times = ["start", "end"]
                     self.__quests_reset_types[etype] = times
