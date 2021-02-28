@@ -79,7 +79,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             if "Quest Resets" in self._pluginconfig.sections():
                 self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
                 self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
-                self.__quests_confidence = self._pluginconfig.getint("Quest Resets", "min_confidence")
 
                 max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
                 self.__quests_max_hour = int(max_time[0])
@@ -103,10 +102,14 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 self.__quests_enable = False
 
             try:
-                with open(self._rootdir + "/walker_settings.json", "r", encoding="utf8") as f:
-                    self.__quests_walkers = json.load(f)
+                with open(self._rootdir + "/walker_settings.txt", "r", encoding="utf8") as f:
+                    quests_walkers = f.read
+                self.__quests_walkers = {}
+                for line in quests_walkers.strip("\n").split("\n"):
+                    splits = line.split(" ")
+                    self.__quests_walkers[splits[0]] = splits[1]
             except FileNotFoundError:
-                self.__quests_walkers = []
+                self.__quests_walkers = {}
 
             self.autoeventThread()
 
@@ -158,7 +161,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         
         found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
-            elem = self._mad['data_manager'].get_resource('walkerarea', walkerarea)
+            elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
 
             current_time = elem["walkervalue"].replace(timestring.replace("?", ""), "")
             if current_time != final_time:

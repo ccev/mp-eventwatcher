@@ -8,5 +8,5 @@ delete_events = false
 enable = true
 default_time = 02:00
 max_time = 12:00
-reset_for = event:start, cday
+reset_for = event:start community-day
 min_confidence = 9
