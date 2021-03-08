@@ -259,9 +259,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 self._spawn_events.append(event_dict)
             if raw_event["has_quests"]:
                 for key in ["start", "end"]:
-                    event_dict["time"] = event_dict[key]
-                    event_dict["time_type"] = key
-                    self._quest_events.append(event_dict)
+                    spawn_dict = event_dict.copy()
+                    spawn_dict["time"] = spawn_dict[key]
+                    spawn_dict["time_type"] = key
+                    self._quest_events.append(spawn_dict)
         
         self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
         self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
