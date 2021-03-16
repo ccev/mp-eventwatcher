@@ -271,15 +271,24 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     def EventWatcher(self):
         # the main loop of the plugin just calling the important functions
         while True:
-            self._get_events()
+            try:
+                self._get_events()
+            except Exception as e:
+                self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
 
             if self.__quests_enable and len(self._quest_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Quest Resets")
-                self._check_quest_resets()
+                try:
+                    self._check_quest_resets()
+                except Exception as e:
+                    self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets: {e}")
 
             if len(self._spawn_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
-                self._check_spawn_events()
+                try:
+                    self._check_spawn_events()
+                except Exception as e:
+                    self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
 
             time.sleep(self.__sleep)
 
