@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import time
+import re
 
 from threading import Thread
 from flask import render_template, Blueprint, jsonify
@@ -161,14 +162,31 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         if final_time is None:
             return
+
+        final_hour, final_minute = final_time.split(":")
         
         found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
             elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
+            current_time = elem["walkervalue"]
 
-            current_time = elem["walkervalue"].replace(timestring.replace("?", ""), "")
-            if current_time != final_time:
-                elem['walkervalue'] = timestring.replace("?", final_time)
+            new_timeparts = timestring.split("-")
+            new_times = []
+            for new_timepart in new_timeparts:
+                if "?" in new_timepart:
+                    new_timepart = new_timepart.replace("?", final_time)
+                if "+" in new_timepart:
+                    add_hour = re.findall(r"\+(\d)", new_timepart)
+                    add_hour = int(add_hour[0])
+                    added_time = str(int(final_hour) + add_hour).zfill(2) + ":" + final_minute
+                    new_timepart = re.sub(r"\+\d", new_timepart, added_time)
+                new_times.append(new_timepart)
+            time_for_area = "-".join(new_times)
+
+            current_time = elem["walkervalue"]
+            self._mad['logger'].success(f"{current_time} vs {time_for_area}")
+            if current_time != time_for_area:
+                elem['walkervalue'] = time_for_area
                 elem.save()
                 self._mad['logger'].success(f"Event Watcher: Updated Quest areas to {final_time}")
                 found_any = True
@@ -281,7 +299,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 try:
                     self._check_quest_resets()
                 except Exception as e:
-                    self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets: {e}")
+                    self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets")
+                    self._mad['logger'].exception(e)
 
             if len(self._spawn_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
