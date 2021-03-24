@@ -133,7 +133,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     def _check_quest_resets(self):
         now = datetime.now()
 
-        if now.hour > self.__quests_max_hour - 2 and now.hour < self.__quests_max_hour + 2:
+        if now.hour > self.__quests_max_hour - 3 and now.hour < self.__quests_max_hour + 3:
             return
 
         def to_timestring(time):
