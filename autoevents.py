@@ -131,12 +131,16 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         return time
 
     def _check_quest_resets(self):
+        now = datetime.now()
+
+        if now.hour > self.__quests_max_hour - 2 and now.hour < self.__quests_max_hour + 2:
+            return
+
         def to_timestring(time):
             return time.strftime("%H:%M")
         smallest_time = datetime(2100, 1, 1, 0, 0, 0)
         final_time = None
 
-        now = datetime.now()
         for event in self._quest_events:
             timetype = event["time_type"]
             if not timetype in self.__quests_reset_types.get(event["type"], []):
