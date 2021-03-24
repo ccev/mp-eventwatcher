@@ -151,11 +151,13 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             if time < smallest_time:
                 smallest_time = time
 
+        smallest_date = smallest_time.date()
+        today = datetime.today()
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if smallest_time.date() == (datetime.today() + timedelta(days=1)).date() or smallest_time.date() == datetime.today().date():
-                if datetime.now().hour > self.__quests_max_hour:
+            if ((smallest_date == (today + timedelta(days=1)).date() and now.hour > self.__quests_max_hour)
+                 or (smallest_date == today.date() and now.hour <= self.__quests_max_hour)):
                    final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
@@ -167,7 +169,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         
         found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
-            elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
+            try:
+                elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
+            except:
+                self._mad['logger'].warning(f"Event Watcher: Couldn't find Walkerarea {walkerarea}")
             current_time = elem["walkervalue"]
 
             new_timeparts = timestring.split("-")
@@ -184,11 +189,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             time_for_area = "-".join(new_times)
 
             current_time = elem["walkervalue"]
-            self._mad['logger'].success(f"{current_time} vs {time_for_area}")
             if current_time != time_for_area:
                 elem['walkervalue'] = time_for_area
                 elem.save()
-                self._mad['logger'].success(f"Event Watcher: Updated Quest areas to {final_time}")
+                self._mad['logger'].success(f"Event Watcher: Updated Walkerarea {walkerarea} to {time_for_area}")
                 found_any = True
         
         if found_any:
