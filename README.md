@@ -43,3 +43,5 @@ The `?` will be replaced with the correct quest reset time. Depending on your wa
 ```
 10 00:00-?
 ```
+
+There's another wildcard, `+X`. This will be replaced with the reset time + X hours. So if the reset time is `08:00`, `?-+2` would be replaced with `08:00-10:00`
