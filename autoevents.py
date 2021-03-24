@@ -156,8 +156,17 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if ((smallest_date == (today + timedelta(days=1)).date() and now.hour > self.__quests_max_hour)
-                 or (smallest_date == today.date() and now.hour <= self.__quests_max_hour)):
+            if (
+                    (
+                        smallest_date == (today + timedelta(days=1)).date()
+                        and now.hour > self.__quests_max_hour
+                    )
+                    or
+                    (
+                        smallest_date == today.date()
+                        and now.hour <= self.__quests_max_hour
+                    )
+                ):
                    final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
