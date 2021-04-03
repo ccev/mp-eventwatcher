@@ -109,7 +109,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     quests_walkers = f.read()
                 self.__quests_walkers = {}
                 for line in quests_walkers.strip("\n").split("\n"):
-                    splits = line.split(" ")
+                    splits = line.split(" ", 1)
                     self.__quests_walkers[splits[0]] = splits[1]
             except FileNotFoundError:
                 self.__quests_walkers = {}
