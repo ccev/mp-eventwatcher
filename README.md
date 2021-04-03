@@ -44,4 +44,10 @@ The `?` will be replaced with the correct quest reset time. Depending on your wa
 10 00:00-?
 ```
 
-There's another wildcard, `+X`. This will be replaced with the reset time + X hours. So if the reset time is `08:00`, `?-+2` would be replaced with `08:00-10:00`
+There are two more wildcards, `+X` and `+X:Y`. `+X:Y` will be replaced with the reset time + X hours and Y minutes. `+X` is equivalent to `+X:00`. So if the reset time is `08:00`, `?-+2` and `?-+2:00` would each be replaced with `08:00-10:00`.
+
+There is no subtraction of time. Instead, you could for example use `+22:30` to get the time 90 minutes before the reset time.
+
+Additionally there are `min` and `max` functions. `min(a,b)` is replaced by the earlier of the two times `a` and `b`, `max(a,b)` by the later one. These functions can also be nested.
+
+Example: `min(?,7:30)-max(+4:15,10:00)` will be replaced by `07:30-12:15` for a reset time of `08:00`.

@@ -186,20 +186,53 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
             except:
                 self._mad['logger'].warning(f"Event Watcher: Couldn't find Walkerarea {walkerarea}")
-            current_time = elem["walkervalue"]
+                continue
 
-            new_timeparts = timestring.split("-")
-            new_times = []
-            for new_timepart in new_timeparts:
-                if "?" in new_timepart:
-                    new_timepart = new_timepart.replace("?", final_time)
-                if "+" in new_timepart:
-                    add_hour = re.findall(r"\+(\d)", new_timepart)
-                    add_hour = int(add_hour[0])
-                    added_time = str(int(final_hour) + add_hour).zfill(2) + ":" + final_minute
-                    new_timepart = re.sub(r"\+\d", new_timepart, added_time)
-                new_times.append(new_timepart)
-            time_for_area = "-".join(new_times)
+            def process_part(part):
+                part = part.strip()
+                # simple time, no replacement necessary
+                if re.match(r"\d+:\d+$", part):
+                    # ensure leading zeros
+                    return ':'.join(x.zfill(2) for x in part.split(':'))
+                # simple replacement of ?
+                if part == '?':
+                    return final_time
+                # replace +X with ? + X hours
+                m = re.match(r"\+(\d+)$", part)
+                if m:
+                    return f"{(int(final_hour) + int(m.group(1))) % 24:02}:{final_minute}"
+                # replace +X:Y with ? + X hours + Y minutes
+                m = re.match(r"\+(\d+):(\d+)$", part)
+                if m:
+                    new_minute = int(final_minute) + int(m.group(2))
+                    new_hour = int(final_hour) + int(m.group(1)) + new_minute // 60
+                    return f"{new_hour % 24:02}:{new_minute % 60:02}"
+                # evaluate min, max
+                m = re.match(r"(\w+)\((.+,.+)\)$", part)
+                if m:
+                    params = m.group(2)
+                    # to allow nested functions, we need to find the correct comma
+                    try:
+                        comma_index = params.index(',')
+                        first_param = params[:comma_index]
+                        while first_param.count('(') != first_param.count(')'):
+                            comma_index = params.index(',', comma_index + 1)
+                            first_param = params[:comma_index]
+                    except ValueError:
+                        # part is formatted wrong, just return default value
+                        return final_time
+                    first_time = process_part(first_param)
+                    second_time = process_part(params[comma_index + 1:])
+                    function = m.group(1).lower()
+                    # this works as intended when both times are correctly formatted with leading zeros
+                    if function == 'min':
+                        return min(first_time, second_time)
+                    elif function == 'max':
+                        return max(first_time, second_time)
+                # part is formatted wrong, just return default value
+                return final_time
+
+            time_for_area = '-'.join(map(process_part, timestring.split('-')))
 
             current_time = elem["walkervalue"]
             if current_time != time_for_area:
