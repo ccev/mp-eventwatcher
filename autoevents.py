@@ -198,6 +198,13 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     add_hour = int(add_hour[0])
                     added_time = str(int(final_hour) + add_hour).zfill(2) + ":" + final_minute
                     new_timepart = re.sub(r"\+\d", new_timepart, added_time)
+                if "|" in new_timepart:
+                    add_hour = re.findall(r"\|(\d)", new_timepart)
+                    add_hour = int(add_hour[0])
+                    if final_time != self.__quests_default_time:
+                        add_hour = 0
+                    added_time = str(int(final_hour) + add_hour).zfill(2) + ":" + final_minute
+                    new_timepart = re.sub(r"\|\d", new_timepart, added_time)
                 new_times.append(new_timepart)
             time_for_area = "-".join(new_times)
 
