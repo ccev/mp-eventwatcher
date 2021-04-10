@@ -191,16 +191,17 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 current_word = ""
                 bracket = 0
                 for char in content:
-                    if char == ",":
-                        parts.append(current_word)
-                        current_word = ""
+                    if char == "," and bracket == 0:
+                            parts.append(current_word)
+                            current_word = ""
+                            char = ""
                     elif char == "(":
                         bracket += 1
                     elif char == ")":
                         bracket -= 1
-                        current_word = ""
-                    elif char != " ":
-                        current_word += char
+
+                    current_word += char
+                parts.append(current_word)
                 return list(map(process_part, parts))
 
             def wildcard_plus(content):
