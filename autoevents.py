@@ -236,10 +236,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     return options[0]
 
             wildcards = {
-                r"add": wildcard_add,
-                r"min": wildcard_min,
-                r"max": wildcard_max,
-                r"ifevent": wildcard_ifevent
+                "add": wildcard_add,
+                "min": wildcard_min,
+                "max": wildcard_max,
+                "ifevent": wildcard_ifevent
             }
 
             def process_part(part):
