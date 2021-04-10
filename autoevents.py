@@ -246,17 +246,27 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 part = part.strip()
                 part = part.replace("?", final_time)
 
-                numbers = part.split(":")
-                new_numbers = []
-                for number in numbers:
-                    new_numbers.append(number.zfill(2))
-                part = ":".join(new_numbers)
+                match0 = re.match(r"^\d*$", part)
+                if match0:
+                    part += ":00"
+                match = re.match(r"\d*:\d*", part)
+                if match:
+                    numbers = part.split(":")
+                    new_numbers = []
+                    for number in numbers:
+                        new_numbers.append(number.zfill(2))
+                    part = ":".join(new_numbers)
 
                 for wildcard, func in wildcards.items():
-                    pattern = wildcard + r"\((.*)\)$"
+                    pattern = "^" + wildcard + r"\((.*)\)$"
                     match = re.match(pattern, part)
                     if match:
-                        func_content = match.groups()[-1]
+                        content = match.groups()[-1]
+                        options = _wildcard_options(content)
+                        if len(options) == 1:
+                            func_content = process_part(options[0])
+                        else:
+                            func_content = list(map(process_part, options))
                         result = func(func_content)
                         part = re.sub(pattern, result, part)
                 return part
