@@ -187,7 +187,21 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 continue
 
             def _wildcard_options(content):
-                return list(map(process_part, content.split(",")))
+                parts = []
+                current_word = ""
+                bracket = 0
+                for char in content:
+                    if char == ",":
+                        parts.append(current_word)
+                        current_word = ""
+                    elif char == "(":
+                        bracket += 1
+                    elif char == ")":
+                        bracket -= 1
+                        current_word = ""
+                    elif char != " ":
+                        current_word += char
+                return list(map(process_part, parts))
 
             def wildcard_plus(content):
                 parts = list(map(int, content.split(":")))
@@ -219,7 +233,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     return options[1]
                 else:
                     return options[0]
-
 
             wildcards = {
                 r"add": wildcard_plus,
