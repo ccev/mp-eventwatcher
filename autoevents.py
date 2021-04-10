@@ -204,7 +204,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 parts.append(current_word)
                 return list(map(process_part, parts))
 
-            def wildcard_plus(content):
+            def wildcard_add(content):
                 parts = list(map(int, content.split(":")))
                 if len(parts) == 1:
                     hour = parts[0]
@@ -236,7 +236,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     return options[0]
 
             wildcards = {
-                r"add": wildcard_plus,
+                r"add": wildcard_add,
                 r"min": wildcard_min,
                 r"max": wildcard_max,
                 r"ifevent": wildcard_ifevent

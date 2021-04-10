@@ -49,5 +49,7 @@ The `?` will be replaced with the correct quest reset time. Depending on your wa
 Wildcards can be used to further refine walkervalues. Their syntax work the same way most functions work in programming languages. E.g. `max(10:00, 12:00)` would return `12:00`. The following wildcards can be used:
 
 - `add(X)` adds X to the reset time. If quests reset at 9am and you use `add(1)` in your walker settings, it would turn to `10:00`. If you use `add(2:30)`, it would become `11:30`.
-- `min(X, Y)` and `max(X, Y)` are replaced either with the smaller or the higher value. If quests reste at 10am, `max(?, 2)` would become `10:00`.
+- `min(X, Y)` and `max(X, Y)` are replaced either with the smaller or the higher value. If quests reset at 10am, `max(?, 2)` would become `10:00`.
 - `ifevent(X, Y)` uses X if there's an event and Y if there's not.
+
+Nested wildcards are supported. So you could use `max(12:00, add(5))` or `ifevent(min(max(03:00, ?), min(04:00, ?)), ?)`
