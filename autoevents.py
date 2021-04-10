@@ -177,8 +177,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         if final_time is None:
             return
-
-        final_hour, final_minute = final_time.split(":")
         
         found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
@@ -188,49 +186,66 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 self._mad['logger'].warning(f"Event Watcher: Couldn't find Walkerarea {walkerarea}")
                 continue
 
+            def _wildcard_options(content):
+                return list(map(process_part, content.split(",")))
+
+            def wildcard_plus(content):
+                parts = list(map(int, content.split(":")))
+                if len(parts) == 1:
+                    hour = parts[0]
+                    minute = 0
+                elif len(parts) == 2:
+                    hour, minute = parts
+                else:
+                    print("?????????????????")
+
+                final_hour, final_minute = tuple(map(int, final_time.split(":")))
+                
+                new_minute = final_minute + minute
+                new_hour = final_hour + hour + new_minute // 60
+                return f"{new_hour % 24:02}:{new_minute % 60:02}"
+
+            def wildcard_min(content):
+                options = _wildcard_options(content)
+                return min(options)
+
+            def wildcard_max(content):
+                options = _wildcard_options(content)
+                return max(options)
+
+            def wildcard_ifevent(content):
+                options = _wildcard_options(content)
+                if final_time == self.__quests_default_time:
+                    return options[1]
+                else:
+                    return options[0]
+
+
+            wildcards = {
+                r"add": wildcard_plus,
+                r"min": wildcard_min,
+                r"max": wildcard_max,
+                r"ifevent": wildcard_ifevent
+            }
+
             def process_part(part):
                 part = part.strip()
-                # simple time, no replacement necessary
-                if re.match(r"\d+:\d+$", part):
-                    # ensure leading zeros
-                    return ':'.join(x.zfill(2) for x in part.split(':'))
-                # simple replacement of ?
-                if part == '?':
-                    return final_time
-                # replace +X with ? + X hours
-                m = re.match(r"\+(\d+)$", part)
-                if m:
-                    return f"{(int(final_hour) + int(m.group(1))) % 24:02}:{final_minute}"
-                # replace +X:Y with ? + X hours + Y minutes
-                m = re.match(r"\+(\d+):(\d+)$", part)
-                if m:
-                    new_minute = int(final_minute) + int(m.group(2))
-                    new_hour = int(final_hour) + int(m.group(1)) + new_minute // 60
-                    return f"{new_hour % 24:02}:{new_minute % 60:02}"
-                # evaluate min, max
-                m = re.match(r"(\w+)\((.+,.+)\)$", part)
-                if m:
-                    params = m.group(2)
-                    # to allow nested functions, we need to find the correct comma
-                    try:
-                        comma_index = params.index(',')
-                        first_param = params[:comma_index]
-                        while first_param.count('(') != first_param.count(')'):
-                            comma_index = params.index(',', comma_index + 1)
-                            first_param = params[:comma_index]
-                    except ValueError:
-                        # part is formatted wrong, just return default value
-                        return final_time
-                    first_time = process_part(first_param)
-                    second_time = process_part(params[comma_index + 1:])
-                    function = m.group(1).lower()
-                    # this works as intended when both times are correctly formatted with leading zeros
-                    if function == 'min':
-                        return min(first_time, second_time)
-                    elif function == 'max':
-                        return max(first_time, second_time)
-                # part is formatted wrong, just return default value
-                return final_time
+                part = part.replace("?", final_time)
+
+                numbers = part.split(":")
+                new_numbers = []
+                for number in numbers:
+                    new_numbers.append(number.zfill(2))
+                part = ":".join(new_numbers)
+
+                for wildcard, func in wildcards.items():
+                    pattern = wildcard + r"\((.*)\)$"
+                    match = re.match(pattern, part)
+                    if match:
+                        func_content = match.groups()[-1]
+                        result = func(func_content)
+                        part = re.sub(pattern, result, part)
+                return part
 
             time_for_area = '-'.join(map(process_part, timestring.split('-')))
 
