@@ -117,7 +117,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.autoeventThread()
 
         except Exception as e:
-            self._mad['logger'].error("Exception initializing EventWatcher: {}", e)
+            self._mad['logger'].error("Exception initializing EventWatcher: ")
+            self._mad['logger'].exception(e)
             return False
 
         return True
