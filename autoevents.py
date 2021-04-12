@@ -220,16 +220,13 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 new_hour = final_hour + hour + new_minute // 60
                 return f"{new_hour % 24:02}:{new_minute % 60:02}"
 
-            def wildcard_min(content):
-                options = _wildcard_options(content)
+            def wildcard_min(options):
                 return min(options)
 
-            def wildcard_max(content):
-                options = _wildcard_options(content)
+            def wildcard_max(options):
                 return max(options)
 
-            def wildcard_ifevent(content):
-                options = _wildcard_options(content)
+            def wildcard_ifevent(options):
                 if final_time == self.__quests_default_time:
                     return options[1]
                 else:
