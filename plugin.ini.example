@@ -7,4 +7,5 @@ delete_events = false
 enable = true
 default_time = 02:00
 max_time = 12:00
+check_timeframe = 18-23
 reset_for = event:start community-day

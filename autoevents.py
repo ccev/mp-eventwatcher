@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from mapadroid.madmin.functions import auth_required
 import mapadroid.utils.pluginBase
 
+
 class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     def __init__(self, mad):
         super().__init__(mad)
@@ -23,7 +24,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._versionconfig.read(self._rootdir + "/version.mpl")
         self.author = self._versionconfig.get("plugin", "author", fallback="ccev")
         self.url = self._versionconfig.get("plugin", "url", fallback="https://github.com/ccev/mp-eventwatcher")
-        self.description = self._versionconfig.get("plugin", "description", fallback="Automatically put Events that boost Spawns in your database")
+        self.description = self._versionconfig.get(
+            "plugin", "description", fallback="Automatically put Events that boost Spawns in your database")
         self.version = self._versionconfig.get("plugin", "version", fallback="1.0")
         self.pluginname = self._versionconfig.get("plugin", "pluginname", fallback="EventWatcher")
 
@@ -47,7 +49,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self.default_time = datetime(2020, 1, 1, 0, 0, 0)
 
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
-            self._plugin = Blueprint(str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
+            self._plugin = Blueprint(
+                str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
 
             for route, view_func in self._routes:
                 self._plugin.add_url_rule(route, route.replace("/", ""), view_func=view_func)
@@ -69,7 +72,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         # do not change this part △△△△△△△△△△△△△△△
 
         # dont start plugin in config mode
-        if self._mad['args'].config_mode == True:
+        if self._mad['args'].config_mode:
             return False
 
         try:
@@ -80,6 +83,9 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             if "Quest Resets" in self._pluginconfig.sections():
                 self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
                 self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
+                self.__quest_timeframe = self._pluginconfig.get("Quest Resets", "check_timeframe", fallback=False)
+                if self.__quest_timeframe:
+                    self.__quest_timeframe = list(map(int, self.__quest_timeframe.split("-")))
 
                 max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
                 self.__quests_max_hour = int(max_time[0])
@@ -122,7 +128,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             return False
 
         return True
-    
+
     def _convert_time(self, time_string, local=True):
         if time_string is None:
             return self.default_time
@@ -134,7 +140,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     def _check_quest_resets(self):
         now = datetime.now()
 
-        if now.hour > self.__quests_max_hour - 3 and now.hour < self.__quests_max_hour + 3:
+        if self.__quests_max_hour - 3 < now.hour < self.__quests_max_hour + 3:
             return
 
         def to_timestring(time):
@@ -144,7 +150,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         for event in self._quest_events:
             timetype = event["time_type"]
-            if not timetype in self.__quests_reset_types.get(event["type"], []):
+            if timetype not in self.__quests_reset_types.get(event["type"], []):
                 continue
 
             time = event["time"]
@@ -161,29 +167,40 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if (
-                    (
-                        smallest_date == (today + timedelta(days=1)).date()
-                        and now.hour > self.__quests_max_hour
-                    )
-                    or
-                    (
-                        smallest_date == today.date()
-                        and now.hour <= self.__quests_max_hour
-                    )
-                ):
-                   final_time = to_timestring(smallest_time)
+            if self.__quest_timeframe:
+                if self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
+                    check = True
+                else:
+                    check = False
+            else:
+                if (
+                        (
+                            smallest_date == (today + timedelta(days=1)).date()
+                            and now.hour > self.__quests_max_hour
+                        )
+                        or
+                        (
+                            smallest_date == today.date()
+                            and now.hour <= self.__quests_max_hour
+                        )
+                 ):
+                    check = True
+                else:
+                    check = False
+
+            if check:
+                final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
 
         if final_time is None:
             return
-        
+
         found_any = False
         for walkerarea, timestring in self.__quests_walkers.items():
             try:
                 elem = self._mad['data_manager'].get_resource('walkerarea', int(walkerarea))
-            except:
+            except Exception:
                 self._mad['logger'].warning(f"Event Watcher: Couldn't find Walkerarea {walkerarea}")
                 continue
 
@@ -193,9 +210,9 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 bracket = 0
                 for char in content:
                     if char == "," and bracket == 0:
-                            parts.append(current_word)
-                            current_word = ""
-                            char = ""
+                        parts.append(current_word)
+                        current_word = ""
+                        char = ""
                     elif char == "(":
                         bracket += 1
                     elif char == ")":
@@ -213,10 +230,11 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 elif len(parts) == 2:
                     hour, minute = parts
                 else:
+                    hour, minute = 0, 0
                     print("?????????????????")
 
                 final_hour, final_minute = tuple(map(int, final_time.split(":")))
-                
+
                 new_minute = final_minute + minute
                 new_hour = final_hour + hour + new_minute // 60
                 return f"{new_hour % 24:02}:{new_minute % 60:02}"
@@ -277,7 +295,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 elem.save()
                 self._mad['logger'].success(f"Event Watcher: Updated Walkerarea {walkerarea} to {time_for_area}")
                 found_any = True
-        
+
         if found_any:
             self._mad["mapping_manager"].update()
             self._mad["logger"].success("Even Watcher: Applied Settings")
@@ -309,7 +327,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     "event_start": self.default_time,
                     "event_end": self.default_time
                 }
-        
+
         # go through all events that boost spawns, check if their times differ from the event in the db
         # and if so, update the db accordingly
         finished_events = []
@@ -330,7 +348,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     self._mad['logger'].success(f"Event Watcher: Updated {event_dict['type']}")
 
                 finished_events.append(event_dict["type"])
-        
+
         # just deletes all events that aren't part of Event Watcher
         if self.__delete_events:
             for event_name in events_in_db:
@@ -360,7 +378,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 "end": end,
                 "type": raw_event["type"]
             }
-            
+
             if raw_event["has_spawnpoints"]:
                 self._spawn_events.append(event_dict)
             if raw_event["has_quests"]:
@@ -369,7 +387,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     spawn_dict["time"] = spawn_dict[key]
                     spawn_dict["time_type"] = key
                     self._quest_events.append(spawn_dict)
-        
+
         self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
         self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
 
