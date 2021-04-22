@@ -339,7 +339,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     vals = {
                         "event_start": event_dict["start"].strftime('%Y-%m-%d %H:%M:%S'),
                         "event_end": event_dict["end"].strftime('%Y-%m-%d %H:%M:%S'),
-                        "event_lure_duration": event_dict.get("lure_duratiion", 30)
+                        "event_lure_duration": event_dict.get("lure", 30)
                     }
                     where = {
                         "event_name": self.type_to_name.get(event_dict["type"], "Others")
@@ -379,6 +379,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 "type": raw_event["type"]
             }
 
+            for bonus in raw_event["bonuses"]:
+                if bonus["template"] == "longer-lure":
+                    event_dict["lure"] = bonus["value"]
+                    break
             if raw_event["has_spawnpoints"]:
                 self._spawn_events.append(event_dict)
             if raw_event["has_quests"]:
