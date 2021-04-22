@@ -380,10 +380,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             }
 
             for bonus in raw_event["bonuses"]:
-                if bonus["template"] == "longer-lure":
-                    event_dict["lure"] = bonus["value"]
+                if bonus.get("template", "") == "longer-lure":
+                    event_dict["lure"] = bonus["value"]*60
                     break
-            if raw_event["has_spawnpoints"]:
+            if raw_event["has_spawnpoints"] or event_dict.get("lure"):
                 self._spawn_events.append(event_dict)
             if raw_event["has_quests"]:
                 for key in ["start", "end"]:
