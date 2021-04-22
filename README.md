@@ -25,6 +25,7 @@ Event Watcher can automatically adjust Quest scan times based on on-going events
 - **enable**: Whether or not to enable auto Quest resets
 default_time: The time you want Quest scans to start on normal days
 - **max_time**: Ignore reset times that are later than this
+- **check_timeframe**: Defines the hours in which the plugin checks quest resets
 - **reset_for**: Define event types and if you want quests to reset for their start, end or both.
   - `event community-day` - if you want to rescan quests for every start and end of an event and cday
   - `event:start` - only rescan quests for event starts (my personal recommendation)
