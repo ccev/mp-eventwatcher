@@ -46,7 +46,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             "default": "DEFAULT",
             "?": "Others"
         }
-        self.default_time = datetime(2020, 1, 1, 0, 0, 0)
+        self.default_time = datetime(2030, 1, 1, 0, 0, 0)
 
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
             self._plugin = Blueprint(
