@@ -140,7 +140,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
     def _check_quest_resets(self):
         now = datetime.now()
 
-        if self.__quests_max_hour - 3 < now.hour < self.__quests_max_hour + 3:
+        if self.__quest_timeframe and not self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
+            return
+
+        if 0 < now.hour < self.__quests_max_hour + 1:
             return
 
         def to_timestring(time):
@@ -167,28 +170,17 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if smallest_time.year == 2100:
             final_time = self.__quests_default_time
         else:
-            if self.__quest_timeframe:
-                if self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
-                    check = True
-                else:
-                    check = False
-            else:
-                if (
-                        (
-                            smallest_date == (today + timedelta(days=1)).date()
-                            and now.hour > self.__quests_max_hour
-                        )
-                        or
-                        (
-                            smallest_date == today.date()
-                            and now.hour <= self.__quests_max_hour
-                        )
-                 ):
-                    check = True
-                else:
-                    check = False
-
-            if check:
+            if (
+                    (
+                        smallest_date == (today + timedelta(days=1)).date()
+                        and now.hour > self.__quests_max_hour
+                    )
+                    or
+                    (
+                        smallest_date == today.date()
+                        and now.hour <= self.__quests_max_hour
+                    )
+             ):
                 final_time = to_timestring(smallest_time)
             else:
                 final_time = self.__quests_default_time
