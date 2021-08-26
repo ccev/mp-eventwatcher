@@ -131,7 +131,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
     def _convert_time(self, time_string, local=True):
         if time_string is None:
-            return self.default_time
+            return None
         time = datetime.strptime(time_string, "%Y-%m-%d %H:%M")
         if not local:
             time = time + timedelta(hours=self.tz_offset)
@@ -363,6 +363,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         for raw_event in raw_events:
             start = self._convert_time(raw_event["start"])
             end = self._convert_time(raw_event["end"])
+            if start is None or end is None:
+                continue
             if end < datetime.now():
                 continue
             event_dict = {
