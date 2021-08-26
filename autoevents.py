@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 
 from mapadroid.madmin.functions import auth_required
 import mapadroid.utils.pluginBase
+from mapadroid.cache import get_cache
+from mapadroid.utils.logging import get_origin_logger
 
 
 class EventWatcher(mapadroid.utils.pluginBase.Plugin):
@@ -79,6 +81,12 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.tz_offset = datetime.now().hour - datetime.utcnow().hour
             self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
             self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
+
+            self._predict_raids = self._pluginconfig.getboolean("plugin", "boss_prediction", fallback=False)
+            self._current_raid = {}
+
+            if self._predict_raids:
+                self._mad["db_wrapper"].proto_submit.raids = self.overwrite_raids
 
             if "Quest Resets" in self._pluginconfig.sections():
                 self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
@@ -351,6 +359,102 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     self._mad['db_wrapper'].autoexec_delete("trs_event", vals)
                     self._mad['logger'].success(f"Event Watcher: Deleted event {event_name}")
 
+    def overwrite_raids(self, origin: str, map_proto: dict, mitm_mapper):
+        """
+        Update/Insert raids from a map_proto dict
+        """
+        cache = get_cache(self._args)
+        origin_logger = get_origin_logger(self._mad["logger"], origin=origin)
+        origin_logger.debug3("DbPogoProtoSubmit::raids called with data received")
+        cells = map_proto.get("cells", None)
+        if cells is None:
+            return False
+        raid_args = []
+        now = datetime.utcfromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
+
+        query_raid = (
+            "INSERT INTO raid (gym_id, level, spawn, start, end, pokemon_id, cp, move_1, move_2, last_scanned, form, "
+            "is_exclusive, gender, costume, evolution) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE level=VALUES(level), spawn=VALUES(spawn), start=VALUES(start), "
+            "end=VALUES(end), pokemon_id=VALUES(pokemon_id), cp=VALUES(cp), move_1=VALUES(move_1), "
+            "move_2=VALUES(move_2), last_scanned=VALUES(last_scanned), is_exclusive=VALUES(is_exclusive), "
+            "form=VALUES(form), gender=VALUES(gender), costume=VALUES(costume), evolution=VALUES(evolution)"
+        )
+
+        for cell in cells:
+            for gym in cell["forts"]:
+                if gym["type"] == 0 and gym["gym_details"]["has_raid"]:
+                    gym_has_raid = gym["gym_details"]["raid_info"]["has_pokemon"]
+                    level = gym["gym_details"]["raid_info"]["level"]
+                    predicted_boss = self._current_raid.get(level, {})
+
+                    if gym_has_raid:
+                        raid_info = gym["gym_details"]["raid_info"]
+
+                        pokemon_id = raid_info["raid_pokemon"]["id"]
+                        cp = raid_info["raid_pokemon"]["cp"]
+                        move_1 = raid_info["raid_pokemon"]["move_1"]
+                        move_2 = raid_info["raid_pokemon"]["move_2"]
+                        form = raid_info["raid_pokemon"]["display"]["form_value"]
+                        gender = raid_info["raid_pokemon"]["display"]["gender_value"]
+                        costume = raid_info["raid_pokemon"]["display"]["costume_value"]
+                        evolution = raid_info["raid_pokemon"]["display"].get("current_temp_evolution", 0)
+                    else:
+                        pokemon_id = predicted_boss.get("id", None)
+                        cp = 0
+                        move_1 = 1
+                        move_2 = 2
+                        form = predicted_boss.get("form", None)
+                        gender = None
+                        costume = predicted_boss.get("costume", None)
+                        evolution = predicted_boss.get("temp_evolution_id", 0)
+
+                    raid_end_sec = int(gym["gym_details"]["raid_info"]["raid_end"] / 1000)
+                    raid_spawn_sec = int(gym["gym_details"]["raid_info"]["raid_spawn"] / 1000)
+                    raid_battle_sec = int(gym["gym_details"]["raid_info"]["raid_battle"] / 1000)
+
+                    raidend_date = datetime.utcfromtimestamp(
+                        float(raid_end_sec)).strftime("%Y-%m-%d %H:%M:%S")
+                    raidspawn_date = datetime.utcfromtimestamp(float(raid_spawn_sec)).strftime(
+                        "%Y-%m-%d %H:%M:%S")
+                    raidstart_date = datetime.utcfromtimestamp(float(raid_battle_sec)).strftime(
+                        "%Y-%m-%d %H:%M:%S")
+
+                    is_exclusive = gym["gym_details"]["raid_info"]["is_exclusive"]
+                    gymid = gym["id"]
+
+                    mitm_mapper.collect_raid_stats(origin, gymid)
+
+                    origin_logger.debug3("Adding/Updating gym {} with level {} ending at {}", gymid, level,
+                                         raidend_date)
+
+                    cache_key = "raid{}{}{}".format(gymid, pokemon_id, raid_end_sec)
+                    if cache.exists(cache_key):
+                        continue
+
+                    raid_args.append(
+                        (
+                            gymid,
+                            level,
+                            raidspawn_date,
+                            raidstart_date,
+                            raidend_date,
+                            pokemon_id, cp, move_1, move_2, now,
+                            form,
+                            is_exclusive,
+                            gender,
+                            costume,
+                            evolution
+                        )
+                    )
+
+                    cache.set(cache_key, 1, ex=900)
+
+        self._db_exec.executemany(query_raid, raid_args, commit=True)
+        origin_logger.debug3("DbPogoProtoSubmit::raids: Done submitting raids with data received")
+        return True
+
     def _get_events(self):
         # get the event list from github
         raw_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/v2/active/events.json").json()
@@ -387,6 +491,12 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
         self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
 
+    def _get_raids(self):
+        raw_raids = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/v2/active/raids.json").json()
+        for level, bosses in raw_raids.items():
+            if len(bosses) == 1:
+                self._current_raid[int(level)] = bosses[0]
+
     def EventWatcher(self):
         # the main loop of the plugin just calling the important functions
         while True:
@@ -394,6 +504,13 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 self._get_events()
             except Exception as e:
                 self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
+
+            try:
+                if self._predict_raids:
+                    self._get_raids()
+            except Exception as e:
+                self._mad['logger'].error(f"Event Watcher: Error while getting raids:")
+                self._mad["logger"].exception(e)
 
             if self.__quests_enable and len(self._quest_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Quest Resets")

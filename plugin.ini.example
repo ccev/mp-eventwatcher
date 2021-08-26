@@ -2,6 +2,7 @@
 active = true
 sleep = 3600
 delete_events = false
+boss_prediction = false
 
 [Quest Resets]
 enable = true
