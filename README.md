@@ -1,3 +1,13 @@
+## This repo is no longer maintained
+
+Due to a lack of motivation and time, I've decided to archive most of my repos. At the time of writing this, it's still fully functional.
+
+### Improvements
+
+Possible improvements that I've thought of
+- Better documentation. I think a lot of people don't understand what Event Watcher does or how it should be configured
+- Possibly an optional Raid Boss prediction. Instead of writing an egg to the DB, it could write the current boss to it. I tried implementing this but it got super hacky. maybe there's a better solution than what I had.
+
 ## Usage:
 You can import this like any other MAD Plugin.
 
