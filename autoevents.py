@@ -3,22 +3,33 @@ import requests
 import json
 import time
 import re
+import asyncio
+import traceback
+from aiohttp import web
+from typing import Dict
+from datetime import datetime, timedelta, timezone
 
-from threading import Thread
-from flask import render_template, Blueprint, jsonify
-from datetime import datetime, timedelta
+import importlib
+register_custom_plugin_endpoints = importlib.import_module("plugins.mp-eventwatcher.endpoints") \
+        .register_custom_plugin_endpoints
 
-from mapadroid.madmin.functions import auth_required
-import mapadroid.utils.pluginBase
+import mapadroid.plugins.pluginBase
+#from plugins.activityFile.endpoints import register_custom_plugin_endpoints
+from mapadroid.db.helper.TrsEventHelper import TrsEventHelper
+from mapadroid.db.model import TrsEvent
+from mapadroid.utils.DatetimeWrapper import DatetimeWrapper
 
 
-class EventWatcher(mapadroid.utils.pluginBase.Plugin):
-    def __init__(self, mad):
-        super().__init__(mad)
+class EventWatcher(mapadroid.plugins.pluginBase.Plugin):
+    def _file_path(self) -> str:
+        return os.path.dirname(os.path.abspath(__file__))
+
+    def __init__(self, subapp_to_register_to: web.Application, mad_parts: Dict):
+        super().__init__(subapp_to_register_to, mad_parts)
 
         self._rootdir = os.path.dirname(os.path.abspath(__file__))
 
-        self._mad = mad
+        self._mad = self._mad_parts
 
         self._pluginconfig.read(self._rootdir + "/plugin.ini")
         self._versionconfig.read(self._rootdir + "/version.mpl")
@@ -32,11 +43,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self.templatepath = self._rootdir + "/template/"
         self.staticpath = self._rootdir + "/static/"
 
-        self._routes = [
-            ("/eventwatcher", self.ewreadme_route),
-        ]
         self._hotlink = [
-            ("Plugin Page", "/eventwatcher", ""),
+            ("Plugin Page", "/eventwatcher", "A friendly placeholder"),
         ]
 
         self.type_to_name = {
@@ -47,29 +55,20 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             "?": "Others"
         }
         self.default_time = datetime(2030, 1, 1, 0, 0, 0)
+        self.local_timezone = datetime.now().astimezone().tzinfo
+        self._mad["logger"].info(f"Determined {self.local_timezone} as local timezone")
 
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
-            self._plugin = Blueprint(
-                str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
-
-            for route, view_func in self._routes:
-                self._plugin.add_url_rule(route, route.replace("/", ""), view_func=view_func)
+            register_custom_plugin_endpoints(self._plugin_subapp)
 
             for name, link, description in self._hotlink:
-                self._mad['madmin'].add_plugin_hotlink(name, self._plugin.name+"."+link.replace("/", ""),
+                self._mad['madmin'].add_plugin_hotlink(name, link.replace("/", ""),
                                                        self.pluginname, self.description, self.author, self.url,
                                                        description, self.version)
 
-    def perform_operation(self):
-        """The actual implementation of the identity plugin is to just return the
-        argument
-        """
-
-        # do not change this part ▽▽▽▽▽▽▽▽▽▽▽▽▽▽▽
+    async def _perform_operation(self):
         if not self._pluginconfig.getboolean("plugin", "active", fallback=False):
             return False
-        self._mad['madmin'].register_plugin(self._plugin)
-        # do not change this part △△△△△△△△△△△△△△△
 
         # dont start plugin in config mode
         if self._mad['args'].config_mode:
@@ -129,16 +128,20 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         return True
 
-    def _convert_time(self, time_string, local=True):
+    def _convert_time(self, time_string, local=True, tz=None):
         if time_string is None:
             return None
-        time = datetime.strptime(time_string, "%Y-%m-%d %H:%M")
+        if not tz:
+            tz = self.local_timezone
+        # I guess "not local" was basically intended to mean "is utc" here?
         if not local:
-            time = time + timedelta(hours=self.tz_offset)
+            time = datetime.strptime(time_string, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+        else:
+            time = datetime.strptime(time_string, "%Y-%m-%d %H:%M").astimezone(tz)
         return time
 
     def _check_quest_resets(self):
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         if self.__quest_timeframe and not self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
             return
@@ -292,15 +295,17 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self._mad["mapping_manager"].update()
             self._mad["logger"].success("Even Watcher: Applied Settings")
 
-    def _check_spawn_events(self):
+    async def _check_spawn_events(self):
         # get existing events from the db and bring them in a format that's easier to work with
         query = "select event_name, event_start, event_end from trs_event;"
-        db_events = self._mad['db_wrapper'].autofetch_all(query)
+        async with self._mad["db_wrapper"] as session, session:
+            db_events = await TrsEventHelper.get_all(session)
         events_in_db = {}
         for db_event in db_events:
-            events_in_db[db_event["event_name"]] = {
-                "event_start": db_event["event_start"],
-                "event_end": db_event["event_end"]
+            events_in_db[db_event.event_name] = {
+                "event_id": db_event.id,
+                "event_start": db_event.event_start,
+                "event_end": db_event.event_end
             }
 
         # check if there are missing event entries in the db and if so, create them
@@ -312,7 +317,10 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     "event_end": self.default_time,
                     "event_lure_duration": 30
                 }
-                self._mad['db_wrapper'].autoexec_insert("trs_event", vals)
+                async with self._mad["db_wrapper"] as session, session:
+                    await TrsEventHelper.save(session, **vals)
+                    await session.commit()
+
                 self._mad['logger'].success(f"Event Watcher: Created event type {event_type_name}")
 
                 events_in_db[event_type_name] = {
@@ -328,16 +336,21 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 type_name = self.type_to_name.get(event_dict["type"], "Others")
                 db_entry = events_in_db[type_name]
                 if db_entry["event_start"] != event_dict["start"] or db_entry["event_end"] != event_dict["end"]:
+                    self._mad['logger'].debug(f'{db_entry["event_start"]} is not {event_dict["start"]} or {db_entry["event_end"]} is not {event_dict["end"]}')
                     vals = {
-                        "event_start": event_dict["start"].strftime('%Y-%m-%d %H:%M:%S'),
-                        "event_end": event_dict["end"].strftime('%Y-%m-%d %H:%M:%S'),
+                        "event_name": type_name,
+                        "event_start": event_dict["start"],
+                        "event_end": event_dict["end"],
                         "event_lure_duration": event_dict.get("lure", 30)
                     }
-                    where = {
-                        "event_name": self.type_to_name.get(event_dict["type"], "Others")
-                    }
-                    self._mad['db_wrapper'].autoexec_update("trs_event", vals, where_keyvals=where)
-                    self._mad['logger'].success(f"Event Watcher: Updated {event_dict['type']}")
+
+                    eventid = db_entry["event_id"] if "event_id" in db_entry else None
+                    async with self._mad["db_wrapper"] as session, session:
+                        await TrsEventHelper.save(session, event_id=eventid, **vals)
+                        await session.commit()
+                    self._mad['logger'].success(f"Event Watcher: Updated event #{eventid}/{event_dict['type']} from "
+                                                f"{vals['event_start']} to {vals['event_end']}, "
+                                                f"with {vals['event_lure_duration']}m lures")
 
                 finished_events.append(event_dict["type"])
 
@@ -345,10 +358,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if self.__delete_events:
             for event_name in events_in_db:
                 if not event_name in self.type_to_name.values():
-                    vals = {
-                        "event_name": event_name
-                    }
-                    self._mad['db_wrapper'].autoexec_delete("trs_event", vals)
+                    async with self._mad["db_wrapper"] as session, session:
+                        await TrsEventHelper.delete_including_spawns(session, events_in_db[event_name]["event_id"])
                     self._mad['logger'].success(f"Event Watcher: Deleted event {event_name}")
 
     def _get_events(self):
@@ -365,7 +376,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             end = self._convert_time(raw_event["end"])
             if start is None or end is None:
                 continue
-            if end < datetime.now():
+            if end < datetime.now(timezone.utc):
                 continue
             event_dict = {
                 "start": start,
@@ -389,13 +400,14 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
         self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
 
-    def EventWatcher(self):
+    async def EventWatcher(self):
         # the main loop of the plugin just calling the important functions
         while True:
             try:
                 self._get_events()
             except Exception as e:
                 self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
+                traceback.print_exc()
 
             if self.__quests_enable and len(self._quest_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Quest Resets")
@@ -408,19 +420,15 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             if len(self._spawn_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
                 try:
-                    self._check_spawn_events()
+                    await self._check_spawn_events()
                 except Exception as e:
                     self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
+                    traceback.print_exc()
 
-            time.sleep(self.__sleep)
+            await asyncio.sleep(self.__sleep)
 
     def autoeventThread(self):
         self._mad['logger'].info("Starting Event Watcher")
 
-        ae_worker = Thread(name="EventWatcher", target=self.EventWatcher)
-        ae_worker.daemon = True
-        ae_worker.start()
-
-    @auth_required
-    def ewreadme_route(self):
-        return render_template("eventwatcher.html", header="Event Watcher", title="Event Watcher")
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.EventWatcher())

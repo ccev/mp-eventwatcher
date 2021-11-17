@@ -1,6 +1,6 @@
 [plugin]
 pluginname = EventWatcher
 description = Automatically put Events that boost Spawns in your database
-author = ccev
+author = ccev / crhbetz
 url = https://github.com/ccev/mp-eventwatcher
-version = 2.3.2
+version = 3.0

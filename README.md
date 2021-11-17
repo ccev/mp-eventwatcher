@@ -1,10 +1,16 @@
-## This repo is no longer maintained
+## Attention - 3.0 breaking change (MAD scalability / asyncio)
 
-Due to a lack of motivation and time, I've decided to archive most of my repos. At the time of writing this, it's still fully functional.
+Version 3.0+ of this plugin has been reworked to operate on the MAD scalability update (currently as of Nov. 2021 on MAD branch redis_mitm_mapper), which relies on asyncio. I have no plans for backwards compatability.
+
+## Development
+
+As @ccev stepped back from further developing a number of his tools, I @crhbetz decided to take over on eventwatcher for now. I'll try my best to keep existing functionality in a working state on asyncio.
+
+Feedback and contributions (PRs) are very welcome.
 
 ### Improvements
 
-Possible improvements that I've thought of
+Possible improvements:
 - Better documentation. I think a lot of people don't understand what Event Watcher does or how it should be configured
 - Possibly an optional Raid Boss prediction. Instead of writing an egg to the DB, it could write the current boss to it. I tried implementing this but it got super hacky. maybe there's a better solution than what I had.
 
