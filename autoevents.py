@@ -14,7 +14,6 @@ register_custom_plugin_endpoints = importlib.import_module("plugins.mp-eventwatc
 
 import mapadroid.plugins.pluginBase
 from mapadroid.db.helper.TrsEventHelper import TrsEventHelper
-from mapadroid.utils.DatetimeWrapper import DatetimeWrapper
 
 
 class EventWatcher(mapadroid.plugins.pluginBase.Plugin):
