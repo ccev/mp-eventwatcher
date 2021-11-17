@@ -4,7 +4,6 @@ import json
 import time
 import re
 import asyncio
-import traceback
 from aiohttp import web
 from typing import Dict
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,6 @@ register_custom_plugin_endpoints = importlib.import_module("plugins.mp-eventwatc
         .register_custom_plugin_endpoints
 
 import mapadroid.plugins.pluginBase
-#from plugins.activityFile.endpoints import register_custom_plugin_endpoints
 from mapadroid.db.helper.TrsEventHelper import TrsEventHelper
 from mapadroid.db.model import TrsEvent
 from mapadroid.utils.DatetimeWrapper import DatetimeWrapper
@@ -407,7 +405,6 @@ class EventWatcher(mapadroid.plugins.pluginBase.Plugin):
                 self._get_events()
             except Exception as e:
                 self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
-                traceback.print_exc()
 
             if self.__quests_enable and len(self._quest_events) > 0:
                 self._mad['logger'].info("Event Watcher: Check Quest Resets")
@@ -423,7 +420,6 @@ class EventWatcher(mapadroid.plugins.pluginBase.Plugin):
                     await self._check_spawn_events()
                 except Exception as e:
                     self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
-                    traceback.print_exc()
 
             await asyncio.sleep(self.__sleep)
 
