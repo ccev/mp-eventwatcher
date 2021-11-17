@@ -14,7 +14,6 @@ register_custom_plugin_endpoints = importlib.import_module("plugins.mp-eventwatc
 
 import mapadroid.plugins.pluginBase
 from mapadroid.db.helper.TrsEventHelper import TrsEventHelper
-from mapadroid.db.model import TrsEvent
 from mapadroid.utils.DatetimeWrapper import DatetimeWrapper
 
 
@@ -358,6 +357,7 @@ class EventWatcher(mapadroid.plugins.pluginBase.Plugin):
                 if not event_name in self.type_to_name.values():
                     async with self._mad["db_wrapper"] as session, session:
                         await TrsEventHelper.delete_including_spawns(session, events_in_db[event_name]["event_id"])
+                        await session.commit()
                     self._mad['logger'].success(f"Event Watcher: Deleted event {event_name}")
 
     def _get_events(self):
