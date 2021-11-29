@@ -79,7 +79,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.tz_offset = datetime.now().hour - datetime.utcnow().hour
             self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
             self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
-            self.__ignore_events_duration_in_days = self._pluginconfig.getint("plugin", "ignore_events_duration_in_days", fallback=999)
+            self.__ignore_events_duration_in_days = self._pluginconfig.getint("plugin", "max_event_duration", fallback=999)
 
             if "Quest Resets" in self._pluginconfig.sections():
                 self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)

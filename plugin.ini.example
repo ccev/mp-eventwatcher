@@ -2,7 +2,8 @@
 active = true
 sleep = 3600
 delete_events = false
-ignore_events_duration_in_days = 30
+; ignore events with duration longer than max_event_duration days
+max_event_duration = 30
 
 [Quest Resets]
 enable = true
