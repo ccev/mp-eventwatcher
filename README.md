@@ -1,6 +1,8 @@
-## This repo is no longer maintained
+## Development
 
-Due to a lack of motivation and time, I've decided to archive most of my repos. At the time of writing this, it's still fully functional.
+As @ccev stepped back from further developing a number of his tools, I @crhbetz decided to take over on eventwatcher for now. I'll try my best to keep existing functionality in a working state. On the `asyncio` branch there's a version aiming at being fully compatible with MADs switch to asyncio that's currently being finished.
+
+Feedback and contributions (PRs) are very welcome.
 
 ### Improvements
 
