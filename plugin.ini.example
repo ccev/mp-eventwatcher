@@ -1,9 +1,18 @@
 [plugin]
+; general plugin activation option ['true´ or 'false']
 active = true
+
+; define the time to wait in-between checking for new events in seconds. default = 3600 (= 1 hour)
 sleep = 3600
+
+; option to delete events from MAD database, which are not part of EventWatcher plugin ['true´ or 'false']
 delete_events = false
-; ignore events with duration longer than max_event_duration days
+
+; ignore events with duration longer than max_event_duration days. default = 999 (disable)
 max_event_duration = 30
+
+; option to automatically delete obsolete pokemon from MAD database on start and end of spawn event to enable MAD to rescan pokemon. ['true´ or 'false']
+reset_pokemons = false
 
 [Quest Resets]
 enable = true

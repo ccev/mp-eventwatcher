@@ -80,7 +80,8 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.__sleep = self._pluginconfig.getint("plugin", "sleep", fallback=3600)
             self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
             self.__ignore_events_duration_in_days = self._pluginconfig.getint("plugin", "max_event_duration", fallback=999)
-
+            self.__reset_pokemons_enable = self._pluginconfig.getboolean("plugin", "reset_pokemons", fallback=False)
+            self.__reset_pokemons_timewindow_in_min = 30 #maximum wild pokemon duration is 60 min
             if "Quest Resets" in self._pluginconfig.sections():
                 self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
                 self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
@@ -137,6 +138,37 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if not local:
             time = time + timedelta(hours=self.tz_offset)
         return time
+
+    def _reset_pokemon(self, eventchange_datetime_UTC):
+        sql_query = "DELETE FROM pokemon WHERE last_modified < %s AND disappear_time > %s"
+        sql_args = (
+            eventchange_datetime_UTC,
+            eventchange_datetime_UTC
+        )
+        dbreturn = self._mad['db_wrapper'].execute(sql_query, sql_args)
+        self._mad['logger'].info(f'Event Watcher: pokemon deleted with sql query: {sql_query} arguments: {sql_args} return: {dbreturn}')
+
+    def _check_pokemon_resets(self):
+        if self._pokemon_events:
+            self._mad['logger'].info("Event Watcher: check pokemon changing events")
+            #get current time to check for eventstart and eventend
+            now = datetime.now()
+            # check, if one of the pokemon event is started or ended in last __reset_pokemons_timewindow_in_min minutes
+            for event in self._pokemon_events:
+                # event start in last __reset_pokemons_timewindow_in_min minutes?
+                if event["start"] <= now <= (event["start"] + timedelta(minutes=self.__reset_pokemons_timewindow_in_min)):
+                    self._mad['logger'].info(f'Event Watcher: event start detected within last {self.__reset_pokemons_timewindow_in_min} minutes for: {event["name"]}')
+                    # remove pokemon from MAD DB, which are scanned before event end and needs to be rescanned, adapt time from local to UTC time
+                    self._reset_pokemon(event["start"] - timedelta(hours=self.tz_offset))
+                    # we found event start trigger, -> exit event loop
+                    break;
+                # event end in last __reset_pokemons_timewindow_in_min minutes?
+                if event["end"] <= now <= (event["end"] + timedelta(minutes=self.__reset_pokemons_timewindow_in_min)):
+                    self._mad['logger'].info(f'Event Watcher: event end detected within last {self.__reset_pokemons_timewindow_in_min} minutes for: {event["name"]}')
+                    # remove pokemon from MAD DB, which are scanned before event end and needs to be rescanned, adapt time from local to UTC time
+                    self._reset_pokemon(event["end"] - timedelta(hours=self.tz_offset))
+                    # we found event end trigger, -> exit event loop
+                    break;
 
     def _check_quest_resets(self):
         now = datetime.now()
@@ -357,6 +389,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         raw_events = requests.get("https://raw.githubusercontent.com/ccev/pogoinfo/v2/active/events.json").json()
         self._spawn_events = []
         self._quest_events = []
+        self._pokemon_events = []
 
         # sort out events that have ended, bring them into a format that's easier to work with
         # and put them into seperate lists depending if they boost spawns or reset quests
@@ -364,6 +397,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         for raw_event in raw_events:
             start = self._convert_time(raw_event["start"])
             end = self._convert_time(raw_event["end"])
+            
             if start is None or end is None:
                 continue
             if end < datetime.now():
@@ -382,42 +416,65 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 if bonus.get("template", "") == "longer-lure":
                     event_dict["lure"] = bonus["value"]*60
                     break
+            # get events with changed spawnpoints
             if raw_event["has_spawnpoints"] or event_dict.get("lure"):
                 self._spawn_events.append(event_dict)
+            # get events with changed quests
             if raw_event["has_quests"]:
                 for key in ["start", "end"]:
                     spawn_dict = event_dict.copy()
                     spawn_dict["time"] = spawn_dict[key]
                     spawn_dict["time_type"] = key
                     self._quest_events.append(spawn_dict)
+            # get events which has changed pokemon pool
+            if raw_event["type"] == 'spotlight-hour' or raw_event["type"] == 'community-day' or raw_event["spawns"]:
+                self._pokemon_events.append(event_dict)
 
         self._quest_events = sorted(self._quest_events, key=lambda e: e["time"])
         self._spawn_events = sorted(self._spawn_events, key=lambda e: e["start"])
+        self._pokemon_events = sorted(self._pokemon_events, key=lambda e: e["start"])
 
     def EventWatcher(self):
         # the main loop of the plugin just calling the important functions
+        get_events_counter = 0
+        
         while True:
-            try:
-                self._get_events()
-            except Exception as e:
-                self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
-
-            if self.__quests_enable and len(self._quest_events) > 0:
-                self._mad['logger'].info("Event Watcher: Check Quest Resets")
+            # check for new events on event website only with configurated event check time
+            if get_events_counter == 0:
                 try:
-                    self._check_quest_resets()
+                    self._get_events()
                 except Exception as e:
-                    self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets")
+                    self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
+
+                if self.__quests_enable and len(self._quest_events) > 0:
+                    self._mad['logger'].info("Event Watcher: Check Quest Resets")
+                    try:
+                        self._check_quest_resets()
+                    except Exception as e:
+                        self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets")
+                        self._mad['logger'].exception(e)
+
+                if len(self._spawn_events) > 0:
+                    self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
+                    try:
+                        self._check_spawn_events()
+                    except Exception as e:
+                        self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
+                        
+                #set cyclecounter to configurated sleep time in minutes. minimum 1 minute
+                get_events_counter = 1 + (self.__sleep / 60)
+            
+            #if enabled, run pokemon reset check every cycle to ensure pokemon rescan just after spawn event change
+            if self.__reset_pokemons_enable:
+                try:
+                    self._check_pokemon_resets()
+                except Exception as e:
+                    self._mad['logger'].error(f"Event Watcher: Error while checking Pokemon Resets")
                     self._mad['logger'].exception(e)
-
-            if len(self._spawn_events) > 0:
-                self._mad['logger'].info("Event Watcher: Check Spawnpoint changing Events")
-                try:
-                    self._check_spawn_events()
-                except Exception as e:
-                    self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
-
-            time.sleep(self.__sleep)
+            
+            #fix 60s sleep -> 1 minute cycle time
+            time.sleep(60)
+            get_events_counter-=1
 
     def autoeventThread(self):
         self._mad['logger'].info("Starting Event Watcher")

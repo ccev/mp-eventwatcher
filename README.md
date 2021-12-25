@@ -19,9 +19,11 @@ If this is the first time you're setting up a MAD Plugin:
 - go to MAD/plugins/EventWatcher/ and `cp plugin.ini.example plugin.ini && cp walker_settings.txt.example walker_settings.txt`
 - Restart MAD
 
-There's two config options:
+There are following config options:
 - `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
 - `delete_events` if you want Event Watcher to delete non-needed events (including basically all you've created yourself) - by default it's set to False.
+- `max_event_duration` ignore events with duration longer than max_event_duration days. Set to 999 if you want to care also for session events
+- `reset_pokemons` option to automatically delete obsolete pokemon from MAD database on start and end of spawn event to enable MAD to rescan pokemon. true: enable function, false: disable function (default)
 
 please also join [this discord](https://discord.gg/cMZs5tk)
 
