@@ -48,7 +48,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         }
         self.default_time = datetime(2030, 1, 1, 0, 0, 0)
         self._last_pokemon_reset_date = datetime(2000, 1, 1, 0, 0, 0)
-
+ 
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
             self._plugin = Blueprint(
                 str(self.pluginname), __name__, static_folder=self.staticpath, template_folder=self.templatepath)
@@ -82,6 +82,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.__delete_events = self._pluginconfig.getboolean("plugin", "delete_events", fallback=False)
             self.__ignore_events_duration_in_days = self._pluginconfig.getint("plugin", "max_event_duration", fallback=999)
             self.__reset_pokemons_enable = self._pluginconfig.getboolean("plugin", "reset_pokemons", fallback=False)
+            self.__reset_pokemons_truncate = self._pluginconfig.getboolean("plugin", "reset_pokemons_truncate", fallback=False)
             self.__reset_pokemons_cooldown_in_s = 1800 # 30 min.
             self.__sleep_mainloop_in_s = 60
             
@@ -143,18 +144,23 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         return time
 
     def _reset_pokemon(self, eventchange_datetime_UTC):
-        sql_query = "DELETE FROM pokemon WHERE last_modified < %s AND disappear_time > %s"
-        sql_args = (
-            eventchange_datetime_UTC,
-            eventchange_datetime_UTC
-        )
+        if self.__reset_pokemons_truncate:
+            sql_query = "TRUNCATE pokemon"
+            sql_args = None
+        else:
+            sql_query = "DELETE FROM pokemon WHERE last_modified < %s AND disappear_time > %s"
+            sql_args = (
+                eventchange_datetime_UTC,
+                eventchange_datetime_UTC
+            )
         dbreturn = self._mad['db_wrapper'].execute(sql_query, sql_args)
-        self._mad['logger'].info(f'Event Watcher: pokemon deleted with sql query: {sql_query} arguments: {sql_args} return: {dbreturn}')
+        self._mad['logger'].info(f'Event Watcher: pokemon deleted by SQL query: {sql_query} arguments: {sql_args} return: {dbreturn}')
 
     def _check_pokemon_resets(self):
         if self._pokemon_events:
             #get current time to check for event start and event end
             now = datetime.now()
+            
             #cooldown check (only check for event start / end, if last pokemon reset is > __reset_pokemons_cooldown_in_s)
             if (self._last_pokemon_reset_date + timedelta(seconds=self.__reset_pokemons_cooldown_in_s)) > now:
                 self._mad['logger'].info(f"Event Watcher: no check of pokemon changing events, because of cooldown (last reset:{self._last_pokemon_reset_date})")
@@ -442,12 +448,11 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._pokemon_events = sorted(self._pokemon_events, key=lambda e: e["start"])
 
     def EventWatcher(self):
-        # the main loop of the plugin just calling the important functions
-        eventscheck_cycle_counter = 0
+        last_checked_events = datetime(2000, 1, 1, 0, 0, 0)
         
         while True:
             # check for new events on event website only with configurated event check time
-            if eventscheck_cycle_counter == 0:
+            if (datetime.now() - last_checked_events) >= timedelta(seconds=self.__sleep):
                 try:
                     self._get_events()
                 except Exception as e:
@@ -469,7 +474,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                         self._mad['logger'].error(f"Event Watcher: Error while checking Spawn Events: {e}")
                         
                 #set eventcheck cyclecounter to configurated sleep time
-                eventscheck_cycle_counter = 1 + (self.__sleep / self.__sleep_mainloop_in_s)
+                last_checked_events = datetime.now()
             
             #if enabled, run pokemon reset check every cycle to ensure pokemon rescan just after spawn event change
             if self.__reset_pokemons_enable:
@@ -480,7 +485,6 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                     self._mad['logger'].exception(e)
             
             time.sleep(self.__sleep_mainloop_in_s)
-            eventscheck_cycle_counter-=1
 
     def autoeventThread(self):
         self._mad['logger'].info("Starting Event Watcher")

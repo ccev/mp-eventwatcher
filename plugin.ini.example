@@ -14,6 +14,9 @@ max_event_duration = 30
 ; option to automatically delete obsolete pokemon from MAD database on start and end of spawn event to enable MAD to rescan pokemon. ['true´ or 'false']
 reset_pokemons = false
 
+; option to use TRUNCATE SQL query instead of DELETE. Recommended for bigger instances ['true´ or 'false']
+reset_pokemons_truncate = false
+
 [Quest Resets]
 enable = true
 default_time = 02:00
