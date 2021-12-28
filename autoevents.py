@@ -149,11 +149,12 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             sql_args = None
         else:
             sql_query = "DELETE FROM pokemon WHERE last_modified < %s AND disappear_time > %s"
+            datestring = eventchange_datetime_UTC.strftime("%Y-%m-%d %H:%M:%S")
             sql_args = (
-                eventchange_datetime_UTC,
-                eventchange_datetime_UTC
+                datestring,
+                datestring
             )
-        dbreturn = self._mad['db_wrapper'].execute(sql_query, sql_args)
+        dbreturn = self._mad['db_wrapper'].execute(sql_query, args=sql_args, commit=True)
         self._mad['logger'].info(f'Event Watcher: pokemon deleted by SQL query: {sql_query} arguments: {sql_args} return: {dbreturn}')
 
     def _check_pokemon_resets(self):
