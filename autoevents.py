@@ -144,7 +144,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         if self.__quest_timeframe and not self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
             return
 
-        if 0 < now.hour < self.__quests_max_hour + 1:
+        if now.hour > self.__quests_max_hour - 3 and now.hour < self.__quests_max_hour + 3:
             return
 
         def to_timestring(time):
