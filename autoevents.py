@@ -48,6 +48,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         }
         self.default_time = datetime(2030, 1, 1, 0, 0, 0)
         self._last_pokemon_reset_check = datetime.now()
+        self._last_quest_reset_check = datetime.now()
 
         if self._pluginconfig.getboolean("plugin", "active", fallback=False):
             self._plugin = Blueprint(
@@ -86,34 +87,24 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             self.__reset_pokemons_truncate = self._pluginconfig.getboolean("plugin", "reset_pokemons_truncate", fallback=False)
 
             if "Quest Resets" in self._pluginconfig.sections():
-                self.__quests_enable = self._pluginconfig.getboolean("Quest Resets", "enable", fallback=False)
-                self.__quests_default_time = self._pluginconfig.get("Quest Resets", "default_time")
-                self.__quest_timeframe = self._pluginconfig.get("Quest Resets", "check_timeframe", fallback=False)
-                if self.__quest_timeframe:
-                    self.__quest_timeframe = list(map(int, self.__quest_timeframe.split("-")))
-
-                max_time = self._pluginconfig.get("Quest Resets", "max_time").split(":")
-                self.__quests_max_hour = int(max_time[0])
-                self.__quests_max_minute = int(max_time[1])
-
+                # handle quest reschedule parameter
+                self.__quests_reschedule_enable = self._pluginconfig.getboolean("Quest Resets", "enable_reschedule", fallback=False)
+                self.__quests_reschedule_default_time = self._pluginconfig.get("Quest Resets", "reschedule_default_time")
+                self.__quest_reschedule_timeframe = self._pluginconfig.get("Quest Resets", "reschedule_check_timeframe", fallback=False)
+                if self.__quest_reschedule_timeframe:
+                    self.__quest_reschedule_timeframe = list(map(int, self.__quest_reschedule_timeframe.split("-")))
+                max_time = self._pluginconfig.get("Quest Resets", "reschedule_max_time").split(":")
+                self.__quests_reschedule_max_hour = int(max_time[0])
+                self.__quests_reschedule_max_minute = int(max_time[1])
+                reschedule_for = self._pluginconfig.get("Quest Resets", "reschedule_for", fallback="event")
+                self.__quests_reschedule_types = self._get_eventchanges_from_parameter(reschedule_for)
+                # handle quest reset parameter
+                self.__quests_reset_enable = self._pluginconfig.getboolean("Quest Resets", "enable_reset", fallback=False)
                 reset_for = self._pluginconfig.get("Quest Resets", "reset_for", fallback="event")
-                self.__quests_reset_types = {}
-                for etype in reset_for.split(" "):
-                    etype = etype.strip()
-                    if ":" in etype:
-                        split = etype.split(":")
-                        etype = split[0]
-                        if "start" in split[1]:
-                            times = ["start"]
-                        elif "end" in split[1]:
-                            times = ["end"]
-                        else:
-                            times = ["start", "end"]
-                    else:
-                        times = ["start", "end"]
-                    self.__quests_reset_types[etype] = times
+                self.__quests_reset_types = self._get_eventchanges_from_parameter(reset_for)
             else:
-                self.__quests_enable = False
+                self.__quests_reschedule_enable = False
+                self.__quests_reset_enable = False
 
             try:
                 with open(self._rootdir + "/walker_settings.txt", "r", encoding="utf8") as f:
@@ -133,6 +124,24 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
             return False
 
         return True
+
+    def _get_eventchanges_from_parameter(self, parameterstring):
+        eventchange_types = {}
+        for etype in parameterstring.split(" "):
+            etype = etype.strip()
+            if ":" in etype:
+                split = etype.split(":")
+                etype = split[0]
+                if "start" in split[1]:
+                    times = ["start"]
+                elif "end" in split[1]:
+                    times = ["end"]
+                else:
+                    times = ["start", "end"]
+            else:
+                times = ["start", "end"]
+            eventchange_types[etype] = times
+        return eventchange_types
 
     def _convert_time(self, time_string, local=True):
         if time_string is None:
@@ -154,35 +163,64 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 datestring
             )
         dbreturn = self._mad['db_wrapper'].execute(sql_query, args=sql_args, commit=True)
-        self._mad['logger'].info(f'Event Watcher: pokemon deleted by SQL query: {sql_query} arguments: {sql_args} return: {dbreturn}')
+        self._mad['logger'].info(f'Event Watcher: Pokemon deleted by SQL query: {sql_query} arguments: {sql_args} return: {dbreturn}')
 
     def _check_pokemon_resets(self):
         #get current time to check for event start and event end
         now = datetime.now()
-        self._mad['logger'].info("Event Watcher: check pokemon changing events")
+        self._mad['logger'].info("Event Watcher: Check Pokemon reset")
         # check, if one of the pokemon event is just started or ended
         for event in self._pokemon_events:
             # event start during last check?
             if self._last_pokemon_reset_check < event["start"] <= now:
-                self._mad['logger'].info(f'Event Watcher: event start detected for event type: {event["type"]} -> reset pokemon')
+                self._mad['logger'].success(f'Event Watcher: Reset Pokemon (event start detected for event type: {event["type"]})')
                 # remove pokemon from MAD DB, which are scanned before event start and needs to be rescanned, adapt time from local to UTC time
                 self._reset_pokemon(event["start"] - timedelta(hours=self.tz_offset))
                 break
             # event end during last check?
             if self._last_pokemon_reset_check < event["end"] <= now:
-                self._mad['logger'].info(f'Event Watcher: event end detected for event type: {event["type"]} -> reset pokemon')
+                self._mad['logger'].success(f'Event Watcher: Reset Pokemon (event end detected for event type: {event["type"]})')
                 # remove pokemon from MAD DB, which are scanned before event end and needs to be rescanned, adapt time from local to UTC time
                 self._reset_pokemon(event["end"] - timedelta(hours=self.tz_offset))
                 break
         self._last_pokemon_reset_check = now;
 
+    def _reset_all_quests(self):
+        sql_query = "TRUNCATE trs_quest"
+        dbreturn = self._mad['db_wrapper'].execute(sql_query, commit=True)
+        self._mad['logger'].info(f'Event Watcher: Quests deleted by SQL query: {sql_query} return: {dbreturn}') 
+
     def _check_quest_resets(self):
+        #get current time to check for event start and event end
+        now = datetime.now()
+        self._mad['logger'].info("Event Watcher: Check Quest reset")
+        # check, if one of the pokemon event is just started or ended
+        for event in self._quest_events:
+            # event starts during last check?
+            if "start" in self.__quests_reset_types.get(event["type"], []):
+                if self._last_quest_reset_check < event["start"] <= now:
+                    self._mad['logger'].success(f'Event Watcher: Reset Quests (event start detected for event type: {event["type"]})')
+                    # remove all quests from MAD DB
+                    self._reset_all_quests()
+                    self._mad["mapping_manager"].update()
+                    break
+            # event end during last check?
+            if "end" in self.__quests_reset_types.get(event["type"], []):
+                if self._last_quest_reset_check < event["end"] <= now:
+                    self._mad['logger'].success(f'Event Watcher: Reset Quests (event end detected for event type: {event["type"]})')
+                    # remove all quests from MAD DB
+                    self._reset_all_quests()
+                    self._mad["mapping_manager"].update()
+                    break
+        self._last_quest_reset_check = now
+
+    def _check_quest_reschedule(self):
         now = datetime.now()
 
-        if self.__quest_timeframe and not self.__quest_timeframe[0] <= now.hour < self.__quest_timeframe[1]:
+        if self.__quest_reschedule_timeframe and not self.__quest_reschedule_timeframe[0] <= now.hour < self.__quest_reschedule_timeframe[1]:
             return
 
-        if 0 < now.hour < self.__quests_max_hour + 1:
+        if now.hour > self.__quests_reschedule_max_hour - 3 and now.hour < self.__quests_reschedule_max_hour + 3:
             return
 
         def to_timestring(time):
@@ -192,13 +230,13 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
 
         for event in self._quest_events:
             timetype = event["time_type"]
-            if timetype not in self.__quests_reset_types.get(event["type"], []):
+            if timetype not in self.__quests_reschedule_types.get(event["type"], []):
                 continue
 
             time = event["time"]
             if time < now:
                 continue
-            if time.hour > self.__quests_max_hour and time.minute >= self.__quests_max_minute:
+            if time.hour > self.__quests_reschedule_max_hour and time.minute >= self.__quests_reschedule_max_minute:
                 continue
 
             if time < smallest_time:
@@ -207,22 +245,22 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         smallest_date = smallest_time.date()
         today = datetime.today()
         if smallest_time.year == 2100:
-            final_time = self.__quests_default_time
+            final_time = self.__quests_reschedule_default_time
         else:
             if (
                     (
                         smallest_date == (today + timedelta(days=1)).date()
-                        and now.hour > self.__quests_max_hour
+                        and now.hour > self.__quests_reschedule_max_hour
                     )
                     or
                     (
                         smallest_date == today.date()
-                        and now.hour <= self.__quests_max_hour
+                        and now.hour <= self.__quests_reschedule_max_hour
                     )
              ):
                 final_time = to_timestring(smallest_time)
             else:
-                final_time = self.__quests_default_time
+                final_time = self.__quests_reschedule_default_time
 
         if final_time is None:
             return
@@ -277,7 +315,7 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 return max(options)
 
             def wildcard_ifevent(options):
-                if final_time == self.__quests_default_time:
+                if final_time == self.__quests_reschedule_default_time:
                     return options[1]
                 else:
                     return options[0]
@@ -451,12 +489,12 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 except Exception as e:
                     self._mad['logger'].error(f"Event Watcher: Error while getting events: {e}")
 
-                if self.__quests_enable and len(self._quest_events) > 0:
-                    self._mad['logger'].info("Event Watcher: Check Quest Resets")
+                if self.__quests_reschedule_enable and len(self._quest_events) > 0:
+                    self._mad['logger'].info("Event Watcher: Check Quest reschedule")
                     try:
-                        self._check_quest_resets()
+                        self._check_quest_reschedule()
                     except Exception as e:
-                        self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets")
+                        self._mad['logger'].error(f"Event Watcher: Error while checking Quest reschedule")
                         self._mad['logger'].exception(e)
 
                 if len(self._spawn_events) > 0:
@@ -475,7 +513,15 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
                 except Exception as e:
                     self._mad['logger'].error(f"Event Watcher: Error while checking Pokemon Resets")
                     self._mad['logger'].exception(e)
-            
+
+            #if enabled, run quest reset check every cycle to ensure quest rescan just after quest related event change
+            if self.__quests_reset_enable:
+                try:
+                    self._check_quest_resets()
+                except Exception as e:
+                    self._mad['logger'].error(f"Event Watcher: Error while checking Quest Resets")
+                    self._mad['logger'].exception(e)
+
             time.sleep(self.__sleep_mainloop_in_s)
 
     def autoeventThread(self):

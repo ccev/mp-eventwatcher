@@ -18,8 +18,18 @@ reset_pokemons = false
 reset_pokemons_truncate = false
 
 [Quest Resets]
-enable = true
-default_time = 02:00
-max_time = 12:00
-check_timeframe = 18-23
+; option to enable quest scan reschedule on upcoming quest related event change ['true' or 'false']
+enable_reschedule = true
+; default time for quest scan
+reschedule_default_time = 02:00
+; reschedule option: latest time for event changes to be considered for quest reschedule
+reschedule_max_time = 12:00
+; reschedule option: defines the timewindow hours in which the plugin checks for quest reschedule 
+reschedule_check_timeframe = 18-23
+; reschedule option: define event types, which shall be considered for quest reschedule. Separate different eventtypes with whitespace. <eventtype>:'start', 'end' or ''(=both)
+reschedule_for = event:start community-day
+
+; option to enable quest reset, which drop MAD table trs_quest on quest related event change ['true' or 'false']
+enable_reset = false
+; reschedule option: define event types, which shall be considered for quest reschedule. Separate different eventtypes with whitespace. <eventtype>:'start', 'end' or ''(=both)
 reset_for = event:start community-day
