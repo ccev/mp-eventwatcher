@@ -171,17 +171,11 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._mad['logger'].info("Event Watcher: Check Pokemon reset")
         # check, if one of the pokemon event is just started or ended
         for event in self._pokemon_events:
-            # event start during last check?
-            if self._last_pokemon_reset_check < event["start"] <= now:
-                self._mad['logger'].success(f'Event Watcher: Reset Pokemon (event start detected for event type: {event["type"]})')
+            # event start/end during last check?
+            if self._last_pokemon_reset_check < event["start"] <= now or self._last_pokemon_reset_check < event["end"] <= now:
+                self._mad['logger'].success(f'Event Watcher: Reset Pokemon (event start/end detected for event type: {event["type"]})')
                 # remove pokemon from MAD DB, which are scanned before event start and needs to be rescanned, adapt time from local to UTC time
                 self._reset_pokemon(event["start"] - timedelta(hours=self.tz_offset))
-                break
-            # event end during last check?
-            if self._last_pokemon_reset_check < event["end"] <= now:
-                self._mad['logger'].success(f'Event Watcher: Reset Pokemon (event end detected for event type: {event["type"]})')
-                # remove pokemon from MAD DB, which are scanned before event end and needs to be rescanned, adapt time from local to UTC time
-                self._reset_pokemon(event["end"] - timedelta(hours=self.tz_offset))
                 break
         self._last_pokemon_reset_check = now;
 
@@ -196,22 +190,17 @@ class EventWatcher(mapadroid.utils.pluginBase.Plugin):
         self._mad['logger'].info("Event Watcher: Check Quest reset")
         # check, if one of the pokemon event is just started or ended
         for event in self._quest_events:
+            timetype = event["time_type"]
+            if timetype not in self.__quests_reset_types.get(event["type"], []):
+                continue
+            eventtime = event["time"]
             # event starts during last check?
-            if "start" in self.__quests_reset_types.get(event["type"], []):
-                if self._last_quest_reset_check < event["start"] <= now:
-                    self._mad['logger'].success(f'Event Watcher: Reset Quests (event start detected for event type: {event["type"]})')
-                    # remove all quests from MAD DB
-                    self._reset_all_quests()
-                    self._mad["mapping_manager"].update()
-                    break
-            # event end during last check?
-            if "end" in self.__quests_reset_types.get(event["type"], []):
-                if self._last_quest_reset_check < event["end"] <= now:
-                    self._mad['logger'].success(f'Event Watcher: Reset Quests (event end detected for event type: {event["type"]})')
-                    # remove all quests from MAD DB
-                    self._reset_all_quests()
-                    self._mad["mapping_manager"].update()
-                    break
+            if self._last_quest_reset_check < eventtime <= now:
+                self._mad['logger'].success(f'Event Watcher: Reset Quests (event start/end detected for event type: {event["type"]})')
+                # remove all quests from MAD DB
+                self._reset_all_quests()
+                self._mad["mapping_manager"].update()
+                break
         self._last_quest_reset_check = now
 
     def _check_quest_reschedule(self):
