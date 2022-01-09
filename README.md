@@ -52,7 +52,7 @@ Both can be used alone or in parallel.
   - Available event types are `event`, `community-day`, `spotlight-hour` and `raid-hour`. The last 2 are less relevant. Most events are of type `event`.
 
 ### Config options (plugin.ini) - Quest reset
-- `enable_reschedule`: Whether or not to enable auto Quest reset by SQL TRUNCATE trs_quest table of MAD database
+- `enable_reset`: Whether or not to enable auto Quest reset by SQL TRUNCATE trs_quest table of MAD database
 - `reset_for`: Define event types, which triggers quest resets for their start, end or both. see `reschedule_for` for details.
 
 ### walker_settings.txt
