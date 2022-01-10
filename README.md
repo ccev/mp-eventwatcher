@@ -27,6 +27,7 @@ If this is the first time you're setting up a MAD Plugin:
 # Config
 
 ## Config options (plugin.ini) - General
+In section `[plugin]`:
 - `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
 - `delete_events` if you want Event Watcher to delete non-needed MAD spawn events (including basically all you've created yourself) - by default it's set to False.
 - `max_event_duration` ignore events with duration longer than max_event_duration days. Set to 999 if you want to care also for session events
@@ -35,25 +36,27 @@ If this is the first time you're setting up a MAD Plugin:
 
 ## Feature: Quest Resets
 There are two different methods to adapt quest scans:
-1. **Quest reschedule**: automatically adjust Quest scan times based on on-going events and then changes your walkerarea values. See chapter "Config options - Quest reschedule" and "walker_settings.txt"
-2. **Quest reset**: delete all quests from MAD DB on quest related event changes. See chapter "Config options - Quest reset"
+1. **Quest reset**: automatically adjust Quest scan times based on on-going events and then changes your walkerarea values. See chapter "Config options - Quest reschedule" and "walker_settings.txt"
+2. **Quest delete**: delete all quests from MAD DB on quest related event changes. See chapter "Config options - Quest reset"
 
 Both can be used alone or in parallel.
 
-### Config options (plugin.ini) - Quest reschedule 
-- `enable_reschedule`: Whether or not to enable auto Quest reschedules
-- `reschedule_default_time`: The time you want Quest scans to start on normal days
-- `reschedule_max_time`: Ignore event changes that are later than this for Quest reschedules
-- `reschedule_check_timeframe`: Defines the hours in which the plugin checks for quest reschedules
-- `reschedule_for`: Define event types, which triggers quest reschedules for their start, end or both.
+### Config options (plugin.ini) - Quest reset
+In section `[Quest Resets]`:
+- `enable`: Whether or not to enable auto Quest reset (reschedule of quest scan).
+- `default_time`: The time you want Quest scans to start on normal days.
+- `max_time`: Ignore event changes that are later than this for Quest reset.
+- `check_timeframe`: Defines the hours in which the plugin checks for quest reset.
+- `reset_for`: Define event types, which triggers quest reset for their start, end or both.
   - `event community-day` - if you want to rescan quests for every start and end of an event and cday
   - `event:start` - only rescan quests for event starts (my personal recommendation)
   - `community-day event:end` - Rescan quests for cday starts and ends, but only for event ends
   - Available event types are `event`, `community-day`, `spotlight-hour` and `raid-hour`. The last 2 are less relevant. Most events are of type `event`.
 
-### Config options (plugin.ini) - Quest reset
-- `enable_reset`: Whether or not to enable auto Quest reset by SQL TRUNCATE trs_quest table of MAD database
-- `reset_for`: Define event types, which triggers quest resets for their start, end or both. see `reschedule_for` for details.
+### Config options (plugin.ini) - Quest delete
+In section `[Quest Resets]`:
+- `enable_quest_delete`: Whether or not to enable auto Quest delete by SQL TRUNCATE trs_quest table of MAD database.
+- `quest_delete_for`: Define event types, which triggers quest delete for their start, end or both. see `reset_for` for details.
 
 ### walker_settings.txt
 ```
