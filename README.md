@@ -1,49 +1,62 @@
-## Development
+# Development
 
 As @ccev stepped back from further developing a number of his tools, I @crhbetz decided to take over on eventwatcher for now. I'll try my best to keep existing functionality in a working state. On the `asyncio` branch there's a version aiming at being fully compatible with MADs switch to asyncio that's currently being finished.
-
 Feedback and contributions (PRs) are very welcome.
 
-### Improvements
+## Improvements
 
 Possible improvements that I've thought of
 - Better documentation. I think a lot of people don't understand what Event Watcher does or how it should be configured
 - Possibly an optional Raid Boss prediction. Instead of writing an egg to the DB, it could write the current boss to it. I tried implementing this but it got super hacky. maybe there's a better solution than what I had.
 
-## Usage:
+# How does it work?
+To not put unnecessary load on cool community-made websites, the Plugin pulls data from [this file](https://github.com/ccev/pogoinfo/blob/v2/active/events.json). A list I automatically update and commit to github.
+
+The Plugin then grabs that file and checks if an event is missing for you or changed information and then updates your database accordingly.
+
+# Install:
 You can import this like any other MAD Plugin.
 
 If this is the first time you're setting up a MAD Plugin:
 - Download Eventwatcher.mp on the [releases page](https://github.com/ccev/mp-eventwatcher/releases)
 - Open {madmin.com}/plugins, click "Choose file" and choose the EventWatcher.mp file you just downloaded. Or drag&drop it there.
 - go to MAD/plugins/EventWatcher/ and `cp plugin.ini.example plugin.ini && cp walker_settings.txt.example walker_settings.txt`
+- configurate plugin by edit plugin.ini and walker_settings.txt (see "Config" chapter)
 - Restart MAD
 
-There's two config options:
+# Config
+
+## Config options (plugin.ini) - General
+In section `[plugin]`:
 - `sleep` to define the time to wait in-between checking for new events. By default it's one hour.
-- `delete_events` if you want Event Watcher to delete non-needed events (including basically all you've created yourself) - by default it's set to False.
+- `delete_events` if you want Event Watcher to delete non-needed MAD spawn events (including basically all you've created yourself) - by default it's set to False.
+- `max_event_duration` ignore events with duration longer than max_event_duration days. Set to 999 if you want to care also for session events
+- `reset_pokemons` option to automatically delete obsolete pokemon from MAD database on start and end of spawn event to enable MAD to rescan pokemon. true: enable function, false: disable function (default)
+- `reset_pokemons_truncate` option to use TRUNCATE SQL query instead of DELETE. Recommended for bigger instances. true: use TRUNCATE, false: use DELETE (default)
 
-please also join [this discord](https://discord.gg/cMZs5tk)
+## Feature: Quest Resets
+There are two different methods to adapt quest scans:
+1. **Quest reset**: automatically adjust Quest scan times based on on-going events and then changes your walkerarea values. See chapter "Config options - Quest reschedule" and "walker_settings.txt"
+2. **Quest delete**: delete all quests from MAD DB on quest related event changes. See chapter "Config options - Quest reset"
 
-## How does it work?
-To not put unnecessary load on cool community-made websites, the Plugin pulls data from [this file](https://github.com/ccev/pogoinfo/blob/v2/active/events.json). A list I automatically update and commit to github.
+Both can be used alone or in parallel.
 
-The Plugin then grabs that file and checks if an event is missing for you or changed information and then updates your database accordingly.
-
-## Quest Resets
-Event Watcher can automatically adjust Quest scan times based on on-going events. It does it by checking the file above for events that reset Quests and then changes your walkerarea values with the event times.
-
-### Config options
-- **enable**: Whether or not to enable auto Quest resets
-default_time: The time you want Quest scans to start on normal days
-- **max_time**: Ignore reset times that are later than this
-- **check_timeframe**: Defines the hours in which the plugin checks quest resets
-- **reset_for**: Define event types and if you want quests to reset for their start, end or both.
+### Config options (plugin.ini) - Quest reset
+In section `[Quest Resets]`:
+- `enable`: Whether or not to enable auto Quest reset (reschedule of quest scan).
+- `default_time`: The time you want Quest scans to start on normal days.
+- `max_time`: Ignore event changes that are later than this for Quest reset.
+- `check_timeframe`: Defines the hours in which the plugin checks for quest reset.
+- `reset_for`: Define event types, which triggers quest reset for their start, end or both.
   - `event community-day` - if you want to rescan quests for every start and end of an event and cday
   - `event:start` - only rescan quests for event starts (my personal recommendation)
   - `community-day event:end` - Rescan quests for cday starts and ends, but only for event ends
   - Available event types are `event`, `community-day`, `spotlight-hour` and `raid-hour`. The last 2 are less relevant. Most events are of type `event`.
 
+### Config options (plugin.ini) - Quest delete
+In section `[Quest Resets]`:
+- `enable_quest_delete`: Whether or not to enable auto Quest delete by SQL TRUNCATE trs_quest table of MAD database.
+- `quest_delete_for`: Define event types, which triggers quest delete for their start, end or both. see `reset_for` for details.
 
 ### walker_settings.txt
 ```
@@ -66,3 +79,6 @@ Wildcards can be used to further refine walkervalues. Their syntax work the same
 - `ifevent(X, Y)` uses X if there's an event and Y if there's not.
 
 Nested wildcards are supported. So you could use `max(12:00, add(5))` or `ifevent(min(max(03:00, ?), min(04:00, ?)), ?)`
+
+# Support / Contact
+Please join [this discord](https://discord.gg/cMZs5tk)

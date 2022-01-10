@@ -1,13 +1,35 @@
 [plugin]
+; general plugin activation option ['true' or 'false']
 active = true
+
+; define the time to wait in-between checking for new events in seconds. default = 3600 (= 1 hour)
 sleep = 3600
+
+; option to delete events from MAD database, which are not part of EventWatcher plugin ['true' or 'false']
 delete_events = false
-; ignore events with duration longer than max_event_duration days
+
+; ignore events with duration longer than max_event_duration days. default = 999 (disable)
 max_event_duration = 30
 
+; option to automatically delete obsolete pokemon from MAD database on start and end of spawn event to enable MAD to rescan pokemon. ['true' or 'false']
+reset_pokemons = false
+
+; option to use TRUNCATE SQL query instead of DELETE. Recommended for bigger instances ['true' or 'false']
+reset_pokemons_truncate = false
+
 [Quest Resets]
+; option to enable quest reset (scan reschedule) on upcoming quest related event change ['true' or 'false']
 enable = true
+; quest reset option: default time for quest scan
 default_time = 02:00
+; quest reset option: latest time for event changes to be considered for quest reset
 max_time = 12:00
+; quest reset option: defines the timewindow hours in which the plugin checks for quest reset
 check_timeframe = 18-23
+; quest reset option: define event types, which shall be considered for quest reset. Separate different eventtypes with whitespace. <eventtype>:'start', 'end' or ''(=both)
 reset_for = event:start community-day
+
+; option to enable quest delete, which drop MAD table trs_quest on quest related event change ['true' or 'false']
+enable_quest_delete = false
+; quest delete option: define event types, which shall be considered for quest reschedule. Separate different eventtypes with whitespace. <eventtype>:'start', 'end' or ''(=both)
+delete_quests_for = event:start community-day
